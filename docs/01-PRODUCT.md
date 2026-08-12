@@ -2,70 +2,87 @@
 
 ## Product statement
 
-Masjid Display adalah sistem digital signage khusus masjid yang menampilkan waktu, jadwal sholat, transisi adzan/iqamah/sholat, Jumat, dan informasi masjid secara otomatis pada TV.
+Masjid Display adalah sistem digital signage masjid **local-only** yang terdiri dari APK Android TV dan APK Android Admin. TV menampilkan jadwal sholat dan menjalankan transisi ibadah otomatis; HP pengurus mengatur konfigurasi dan mengirim media langsung melalui LAN.
 
 ## Masalah yang diselesaikan
 
-Display masjid sering terlalu padat, sulit dibaca dari jauh, membutuhkan internet terus-menerus, atau menggunakan template generik. Produk ini mengutamakan konteks ibadah dan keterbacaan.
+- Display masjid sering terlalu padat dan sulit dibaca.
+- Setup/kontrol TV sering membutuhkan remote/keyboard yang merepotkan.
+- Transfer foto ke TV pada banyak solusi sejenis terlalu rumit atau tidak stabil.
+- Sistem masjid harus tetap bekerja tanpa bergantung server/internet.
 
-## Persona utama
+## Persona
 
 ### Jamaah
-Membutuhkan waktu sekarang, jadwal sholat, sholat berikutnya, dan informasi transisi yang terbaca dalam beberapa detik dari jarak jauh.
+Membutuhkan waktu, sholat berikutnya, countdown, jadwal, dan state adzan/iqamah yang terbaca cepat dari jarak jauh.
 
 ### Pengurus masjid
-Membutuhkan setup sederhana, koreksi jadwal, iqamah, Jumat, pengumuman, identitas masjid, dan preview tanpa mengoperasikan TV secara langsung.
+Membutuhkan setup lewat HP, koreksi jadwal, iqamah, Jumat, announcement, tampilan, dan transfer foto yang sederhana.
 
-## Surfaces
+## Product surfaces
 
-### Display App
-Fullscreen 16:9, unattended, berjalan sepanjang hari, tidak memiliki navigation chrome.
+### TV App
+Android TV/STB APK, fullscreen 16:9, autonomous, unattended.
 
 ### Admin App
-Mobile-first web UI untuk konfigurasi, konten, jadwal, preview, dan status perangkat.
+Android phone APK, mobile-first native UI. Pair ke TV melalui LAN dan mengontrol konfigurasi/media tanpa server.
 
-## MVP — wajib
+## Golden path
 
-- Mosque setup: nama, lokasi, timezone, koordinat, logo opsional.
-- Prayer times: Subuh, Syuruq opsional, Dzuhur, Ashar, Maghrib, Isya.
-- Per-prayer correction offset.
-- Per-prayer iqamah duration.
-- Gregorian + Hijri date.
-- Current time.
-- Next prayer + countdown.
-- Automatic display state transitions.
+Install TV → QR pairing → scan dari Admin App → konfigurasi masjid → kirim ke TV → TV berjalan mandiri → pengurus dapat reconnect otomatis di LAN untuk perubahan berikutnya.
+
+## MVP wajib
+
+- Identitas masjid, koordinat, timezone, logo.
+- Jadwal Subuh, Syuruq informasional, Dzuhur, Ashar, Maghrib, Isya.
+- Koreksi waktu per sholat.
+- Durasi iqamah per sholat.
+- Masehi + Hijriah.
+- Current time + next prayer countdown.
+- Automatic state transitions.
 - Friday mode.
-- Announcement ticker/card.
-- QRIS donation card opsional.
-- Offline cache dan deterministic boot.
-- Minimum satu layout TV yang production-quality.
-- Admin settings + live preview dasar.
+- Announcement.
+- QRIS opsional.
+- Minimum satu layout TV production-quality.
+- Admin APK.
+- QR pairing.
+- Auto discovery/reconnect TV di LAN.
+- Local configuration protocol.
+- Multi-photo transfer HP → TV dengan progress/retry.
+- Local Room/SQLite persistence.
 
-## Bukan MVP
+## Non-goals MVP
 
+- Web admin.
+- Cloud/backend/server.
+- Remote control dari luar LAN.
+- Online account/login.
 - Multi-mosque organization management.
 - Analytics kompleks.
-- Donation payment processing.
+- Payment processing.
 - Live streaming.
 - Marketplace template.
-- Social media integrations.
 - AI content generation.
 - Video editor.
 
 ## UX principles
 
-1. Jamaah harus menangkap informasi utama dalam <= 3 detik.
-2. Satu state memiliki satu focal point.
-3. Jadwal tidak boleh kalah secara visual oleh announcement/donasi.
-4. Countdown harus menggunakan waktu absolut, bukan decrement counter yang mudah drift.
-5. Admin harus dapat preview state tanpa menunggu waktu sholat asli.
-6. Semua core state harus dapat diuji menggunakan dev state switcher.
+1. Jamaah menangkap informasi utama <= 3 detik.
+2. Satu display state memiliki satu focal point.
+3. Jadwal tidak kalah oleh announcement/donasi.
+4. Countdown berbasis absolute target time.
+5. Pengurus tidak perlu mengetik IP pada flow normal.
+6. Pairing pertama harus dapat dilakukan dengan scan QR.
+7. Transfer foto harus terasa seperti mengirim file ke perangkat dekat: pilih → kirim → progress → selesai.
+8. TV tidak membutuhkan HP setelah konfigurasi tersimpan.
 
-## Success criteria MVP
+## Success criteria
 
-- Boot tanpa internet tetap menghasilkan jadwal valid dari data/cache yang tersedia.
-- State berubah otomatis pada boundary waktu yang benar.
-- Tidak ada teks kritis di luar TV safe area.
-- Semua sholat dapat memiliki koreksi dan iqamah berbeda.
-- Admin dapat menyelesaikan konfigurasi awal tanpa keyboard/mouse pada TV.
-- Informasi kritis tetap terbaca pada 720p, 1080p, dan 4K scaling.
+- TV reboot dan kembali menampilkan jadwal dari data lokal.
+- State berubah pada boundary waktu yang benar.
+- Admin dapat pair tanpa mengetik IP.
+- IP DHCP berubah tetapi paired TV dapat ditemukan kembali.
+- Config yang dikirim Admin tervalidasi dan tersimpan di TV.
+- Beberapa foto dapat dikirim melalui LAN dengan retry file gagal.
+- Internet mati/tidak tersedia tidak memengaruhi operasi display.
+- UI kritis terbaca pada target Android TV 720p/1080p/4K.
