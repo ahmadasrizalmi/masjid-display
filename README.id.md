@@ -13,6 +13,33 @@ Masjid Display terdiri dari dua APK:
 
 Tidak ada akun online, web admin, backend internet, database cloud, atau cloud storage.
 
+## Visual UI Blueprint
+
+Visual concept sudah dibuat sebagai companion untuk wireframe tekstual. Implementasi harus memperlakukan visual sebagai **arah desain**, sedangkan behavior, hierarchy, dan state tetap mengikuti dokumen SSOT.
+
+Visual mencakup:
+
+- TV NORMAL: identitas masjid, jam besar, next prayer, countdown, jadwal harian, ticker.
+- TV ADHAN: satu focal point berupa nama sholat + waktu adzan.
+- TV IQAMAH: countdown besar, termasuk emphasis 30 detik terakhir.
+- TV PRAYER: layar minimal untuk merapatkan/meluruskan shaf.
+- TV INFORMATION: kajian/pengumuman dengan prayer context tetap tersedia.
+- TV DONATION/QRIS: hanya pada state yang mengizinkan.
+- TV FRIDAY: presentation khusus Jumat.
+- Variasi tema visual tanpa mengubah hierarchy informasi.
+- Admin Home, Jadwal, Pengumuman, Media, Photo Picker, transfer progress, daftar perangkat, QR pairing, dan Pengaturan.
+
+### Aturan membaca visual
+
+1. Visual bukan izin untuk menambah state baru.
+2. `docs/04-STATE-MACHINE.md` tetap otoritas behavior.
+3. `docs/05-UI-TV.md` tetap otoritas hierarchy/safe-area TV.
+4. `docs/06-UI-ADMIN.md` tetap otoritas flow Admin APK.
+5. Teks kecil/detail hasil mockup boleh disempurnakan saat implementasi; struktur dan focal point yang disetujui harus dipertahankan.
+6. Jangan menambahkan konsep cloud/online dari interpretasi visual.
+
+> Asset visual target repo: `docs/assets/masjid-display-ui-blueprint.png`. Jika asset belum ada pada checkout, gunakan dokumen UI sebagai SSOT dan jangan membuat desain alternatif sendiri.
+
 ## Pengalaman utama
 
 1. Install/buka TV App.
