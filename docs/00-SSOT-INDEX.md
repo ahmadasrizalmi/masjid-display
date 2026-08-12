@@ -2,68 +2,66 @@
 
 Status: **Normative / Source of Truth**
 
-Dokumen ini adalah pintu masuk spesifikasi Masjid Display. Tujuannya menjaga proses coding—termasuk coding oleh AI—tetap konsisten tanpa harus membaca satu dokumen raksasa.
+Dokumen ini adalah pintu masuk spesifikasi Masjid Display.
+
+## Keputusan arsitektur yang dikunci
+
+MVP adalah **dua APK Android native yang berkomunikasi lokal**:
+
+- TV App = autonomous runtime/source of truth operasional.
+- Admin App = configurator + media sender.
+- Komunikasi = Wi-Fi/LAN lokal.
+- Persistence TV = Room/SQLite + local media storage.
+
+**Dilarang menambahkan web app, PWA, backend internet, cloud database/storage, online account, remote cloud sync, Supabase, Cloudflare, atau infrastructure alternatif ke implementasi MVP.**
+
+Jika kebutuhan itu muncul di masa depan, SSOT harus direvisi secara eksplisit terlebih dahulu. Jangan membuat abstraction/fallback spekulatif untuk cloud.
 
 ## Aturan prioritas
 
-Jika ada konflik spesifikasi, gunakan urutan berikut:
+Jika ada konflik:
 
-1. `00-SSOT-INDEX.md` untuk aturan dokumentasi.
-2. Dokumen domain yang paling spesifik (`03`–`07`).
-3. `01-PRODUCT.md` untuk scope produk.
-4. `02-ARCHITECTURE.md` untuk batas teknis.
-5. `08-IMPLEMENTATION.md` untuk urutan implementasi.
-6. Dokumen legacy hanya sebagai referensi historis.
+1. `00-SSOT-INDEX.md`
+2. Dokumen domain paling spesifik (`03`–`07`)
+3. `01-PRODUCT.md`
+4. `02-ARCHITECTURE.md`
+5. `08-IMPLEMENTATION.md`
 
-**Jangan menebak jika SSOT belum menentukan behavior penting.** Tambahkan keputusan ke dokumen yang tepat sebelum implementasi.
+Tidak ada dokumen legacy yang dianggap authoritative.
 
 ## Peta dokumen
 
-### 01 — Product
-Baca ketika menentukan fitur, acceptance criteria, prioritas, atau apakah sesuatu masuk MVP.
-
-### 02 — Architecture
-Baca sebelum membuat package, service, dependency, deployment, API, storage, atau memilih library.
-
-### 03 — Domain & Data
-Baca untuk prayer schedule, koreksi waktu, iqamah, mosque config, announcement, dan model persistence.
-
-### 04 — State Machine
-Baca untuk semua behavior display. Ini adalah otoritas utama tentang apa yang tampil pada waktu tertentu.
-
-### 05 — UI TV
-Baca ketika mengimplementasikan komponen/display 16:9, typography, safe area, hierarchy, atau responsive TV.
-
-### 06 — UI Admin
-Baca ketika mengimplementasikan onboarding, settings, content management, preview, atau kontrol admin.
-
-### 07 — Offline & Sync
-Baca untuk cache, koneksi internet, persistence, boot, sync, fallback, dan recovery.
-
-### 08 — Implementation
-Baca ketika membuat struktur repo, milestone, test, atau memilih task berikutnya.
+- `01-PRODUCT.md` — fitur, persona, MVP, non-goals.
+- `02-ARCHITECTURE.md` — Kotlin/Android modules, persistence, LAN protocol, security.
+- `03-DOMAIN-DATA.md` — prayer schedule, config, iqamah, announcement, model data.
+- `04-STATE-MACHINE.md` — otoritas behavior temporal display.
+- `05-UI-TV.md` — wireframe 16:9 dan visual hierarchy.
+- `06-UI-ADMIN.md` — Admin APK, pairing, settings, media UX.
+- `07-OFFLINE-SYNC.md` — local persistence, discovery, pairing, protocol, transfer file.
+- `08-IMPLEMENTATION.md` — phase build, test, definition of done.
 
 ## Prinsip lintas dokumen
 
-- TV display adalah surface utama.
-- Informasi sholat memiliki prioritas tertinggi.
-- State machine mengontrol UI; komponen UI tidak menentukan state bisnis.
-- Core prayer operation harus tetap berjalan offline.
-- Admin dan Display dipisahkan secara konseptual.
-- Theme boleh mengubah estetika, tidak boleh mengubah hierarchy informasi.
-- Jangan memasukkan fitur di luar MVP hanya karena mudah dibuat.
-- Optimalkan readability dari jarak jauh, bukan density informasi.
+- TV harus tetap berfungsi setelah HP admin disconnect.
+- Internet bukan bagian dari runtime produk.
+- Informasi sholat memiliki prioritas visual tertinggi.
+- State machine mengontrol UI; Composable tidak menentukan business state sendiri.
+- File media dikirim langsung HP → TV melalui LAN.
+- IP address tidak boleh menjadi identitas permanen perangkat.
+- Pairing harus aman dan mudah bagi pengurus non-teknis.
+- Theme tidak boleh mengubah hierarchy/state behavior.
+- Optimalkan readability TV dari jarak jauh.
 
-## Protokol kerja untuk AI/code generator
+## Protokol AI/code generator
 
 Untuk setiap task:
 
-1. Identifikasi domain task.
-2. Baca Index + maksimal dokumen domain yang diperlukan.
-3. Nyatakan requirement/acceptance criteria yang sedang diimplementasikan.
-4. Implementasikan perubahan sekecil mungkin.
-5. Tambahkan/update test.
-6. Verifikasi tidak ada konflik dengan state machine/offline rules.
-7. Update SSOT jika keputusan produk/arsitektur berubah.
+1. Identifikasi phase dan module.
+2. Baca Index + dokumen domain yang diperlukan saja.
+3. Nyatakan acceptance criteria.
+4. Implement perubahan kecil dan terverifikasi.
+5. Tambah/update test.
+6. Verifikasi tidak ada dependency cloud/web/backend yang masuk.
+7. Update SSOT terlebih dahulu jika keputusan produk/arsitektur berubah.
 
-Hindari meminta generator membaca seluruh repo dan mengimplementasikan banyak milestone sekaligus. Kerjakan vertical slice kecil yang dapat diverifikasi.
+Hindari generate seluruh aplikasi sekaligus.
