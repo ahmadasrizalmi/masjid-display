@@ -1,6 +1,6 @@
 # 04 — Display State Machine
 
-Dokumen ini adalah otoritas utama behavior temporal Display.
+Dokumen ini adalah otoritas utama behavior temporal TV App.
 
 ## States
 
@@ -12,17 +12,16 @@ IQAMAH_COUNTDOWN
 PRAYER
 FRIDAY
 INFORMATION
-OFFLINE
 ERROR
 ```
 
-`OFFLINE` adalah connectivity condition yang umumnya berupa indicator, bukan state yang mengalahkan prayer flow. `ERROR` hanya mengambil alih jika core display tidak dapat menghasilkan informasi aman.
+Koneksi LAN/internet bukan display state. TV tetap menjalankan state machine dari data lokal.
 
 ## Main flow
 
 ```text
 NORMAL
-  ↓ threshold approaching
+  ↓ approaching threshold
 APPROACHING_PRAYER
   ↓ corrected prayer time
 ADHAN
@@ -36,8 +35,6 @@ NORMAL
 
 ## Priority
 
-Dari tertinggi:
-
 1. ERROR kritis
 2. FRIDAY active worship window
 3. ADHAN
@@ -45,58 +42,56 @@ Dari tertinggi:
 5. PRAYER
 6. APPROACHING_PRAYER
 7. NORMAL
-8. INFORMATION overlay/rotation
+8. INFORMATION rotation
 
-Announcement/donation tidak boleh menginterupsi state ibadah prioritas tinggi.
+Announcement/donation tidak menginterupsi state ibadah prioritas tinggi.
 
 ## NORMAL
 
-Menampilkan current time, next prayer, countdown, daily schedule, mosque identity, date, dan announcement minimal.
+Current time, next prayer, countdown, daily schedule, mosque identity, date, announcement minimal.
 
 ## APPROACHING_PRAYER
 
-Aktif dalam configurable threshold sebelum corrected prayer time. MVP default: 10 menit. Next prayer menjadi focal point; konten sekunder dikurangi.
+Aktif dalam threshold sebelum corrected prayer time. Default MVP 10 menit. Konten sekunder dikurangi.
 
 ## ADHAN
 
-Mulai tepat pada corrected prayer timestamp. Tampilan minimal: nama sholat + waktu + label waktu adzan. Tidak menampilkan QRIS/promosi.
-
-Durasi layar adzan adalah konfigurasi display, bukan asumsi panjang audio adzan.
+Mulai tepat pada corrected prayer timestamp. Nama sholat + waktu + konteks adzan. QRIS/pengumuman disembunyikan.
 
 ## IQAMAH_COUNTDOWN
 
-Target absolut = corrected prayer timestamp + iqamah duration. Countdown selalu dihitung dari target-now.
-
-Pada 60 detik terakhir, UI boleh masuk visual emphasis tanpa membuat domain state baru.
+Target absolut = corrected prayer timestamp + iqamah duration. Countdown = target - now. 60 detik terakhir boleh memiliki emphasis visual tanpa state domain baru.
 
 ## PRAYER
 
-Mulai ketika target iqamah tercapai. Tampilan sangat minimal; announcement dan donation disembunyikan. Setelah configured prayer screen duration, kembali ke NORMAL.
+Mulai saat target iqamah tercapai. Tampilan minimal. Setelah configured prayer screen duration kembali NORMAL.
 
 ## FRIDAY
 
-Hanya Jumat. Detail waktu/trigger dikonfigurasi pada FridayConfig. Saat window Jumat aktif, Friday mengalahkan normal Dhuhr presentation. Implementasi detail khutbah/petugas dapat bertahap, tetapi tidak boleh menjalankan dua flow visual yang saling bertabrakan.
+Pada Jumat, FridayConfig menentukan window dan menggantikan presentation Dzuhur yang relevan. Tidak boleh ada dua flow visual yang bertabrakan.
 
 ## INFORMATION
 
-Bukan interrupt bebas. Information hanya boleh muncul/rotate ketika state efektif NORMAL dan tidak berada pada suppression window menjelang sholat.
-
-## OFFLINE
-
-Jika internet putus namun config/schedule valid tersedia, prayer state engine tetap berjalan. Tampilkan indikator kecil dan tidak mengganggu focal point.
+Hanya dapat rotate ketika effective state NORMAL dan di luar suppression window menjelang sholat.
 
 ## ERROR
 
-Gunakan hanya jika tidak ada last-known-good config/schedule yang cukup untuk operasi aman. Pesan harus actionable untuk pengurus, tetapi tidak menampilkan stack trace.
+Hanya jika konfigurasi lokal tidak cukup/invalid sehingga display tidak dapat menghasilkan informasi yang aman. Pesan actionable untuk pengurus, tanpa stack trace.
 
-## Determinism requirement
+Kegagalan HP menemukan TV atau LAN putus **bukan ERROR display**.
 
-Diberikan `(now, canonical schedule, config)`, fungsi resolver harus menghasilkan state efektif yang sama tanpa bergantung pada urutan render React atau timer sebelumnya.
+## Determinism
 
-Target API:
+Diberikan `(now, canonicalSchedule, config)`, resolver harus menghasilkan state yang sama tanpa bergantung pada urutan Compose render atau timer sebelumnya.
 
-```ts
-resolveDisplayState({ now, schedule, config }): DisplayState
+Target pure Kotlin API:
+
+```kotlin
+fun resolveDisplayState(
+    now: ZonedDateTime,
+    schedule: DailyPrayerSchedule,
+    config: DisplayRuntimeConfig
+): DisplayState
 ```
 
-Ini wajib memiliki unit test pada boundary detik sebelum/saat/setelah setiap transition.
+Wajib unit test detik sebelum/saat/setelah transition.
