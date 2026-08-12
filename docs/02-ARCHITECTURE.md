@@ -1,112 +1,141 @@
 # 02 — Architecture & Tech Stack
 
-## Architecture decision
+## Keputusan arsitektur final MVP
 
-MVP menggunakan **TypeScript monorepo** dengan dua aplikasi web yang berbagi domain package. Display dibuat sebagai PWA/fullscreen web app sehingga dapat dijalankan pada Chromium kiosk, Android TV browser/wrapper, STB, mini-PC, atau Raspberry Pi-class device tanpa menggandakan business logic.
+Masjid Display adalah **sistem Android native, local-only, tanpa backend dan tanpa cloud**. Terdapat dua APK:
+
+1. **TV App** — otak sistem dan runtime display pada Android TV/STB Android.
+2. **Admin App** — remote/configurator pada HP Android yang berkomunikasi langsung dengan TV melalui jaringan lokal.
+
+Tidak ada web admin, server, akun online, database cloud, remote API, atau storage cloud pada arsitektur MVP.
+
+## Prinsip authority
+
+TV App adalah authoritative runtime. Setelah konfigurasi diterima dan disimpan TV, HP admin boleh disconnect/mati/dibawa pulang dan TV harus tetap berjalan penuh.
+
+Admin App hanya mengedit konfigurasi, mengirim command/config/media, melihat status, dan preview.
 
 ## Tech stack
 
-### Runtime & language
-- Node.js LTS
-- TypeScript strict mode
-- pnpm workspaces
+### Platform
+- Kotlin
+- Android SDK
+- Gradle Kotlin DSL
+- Multi-module Android project
 
-### Frontend
-- React
-- Vite
-- React Router untuk Admin; Display sebisa mungkin single-route
-- Tailwind CSS untuk design tokens/utilities
-- CSS variables untuk theme runtime
-- Lucide untuk icon admin; icon pada TV diminimalkan
+### UI
+- Jetpack Compose
+- Android TV/Compose TV patterns untuk TV App
+- Material 3 Compose untuk Admin App
+- Shared design tokens boleh berada di core, tetapi layout TV dan HP tidak dipaksa berbagi komponen yang sama
 
-### State & validation
-- Zustand untuk client/app state sederhana
-- Zod untuk runtime schema/config validation
-- Domain state machine ditulis sebagai pure TypeScript reducer/transition engine; hindari mengikat business rules ke React component lifecycle
+### Persistence
+- Room di atas SQLite untuk data terstruktur
+- DataStore untuk preference kecil
+- Android internal app storage untuk foto/logo/QR/background
 
-### Data
-- IndexedDB via Dexie untuk persistence lokal Display
-- LocalStorage hanya untuk preference kecil non-kritis
-- Backend fase berikutnya: Supabase (PostgreSQL, Auth, Storage, Realtime) agar admin remote dapat sinkron ke device
+### Async/runtime
+- Kotlin Coroutines
+- Flow/StateFlow
+- WorkManager hanya untuk pekerjaan lokal terjadwal yang memang perlu survive process restart
 
-### Prayer calculation
-- Adhan.js sebagai kandidat calculation engine lokal.
-- Semua output calculation melewati domain adapter milik aplikasi agar library dapat diganti tanpa mengubah UI.
-- Timezone harus eksplisit menggunakan IANA timezone.
+### Local communication
+- Android NSD / mDNS untuk discovery TV pada LAN
+- QR pairing untuk bootstrap trusted relationship
+- HTTP lokal pada TV sebagai transport aplikasi MVP, bind hanya ke interface lokal yang diperlukan
+- JSON serialization menggunakan kotlinx.serialization
+- Protocol versioning wajib
+- Pairing token/session credential tidak boleh dikirim ulang sebagai plaintext UI
 
-### Date/time
-- Luxon untuk timezone-aware date/time operations.
-- Countdown dihitung dari `targetTimestamp - now`, bukan decrement interval state.
+### Media
+- Android Photo Picker pada Admin App
+- Stream file langsung HP → TV melalui LAN
+- TV memvalidasi metadata, ukuran, tipe, checksum, lalu menyimpan ke internal storage
+- Metadata media disimpan Room
+- Tidak ada upload internet
+
+### Prayer & time
+- Prayer calculation adalah Kotlin module lokal tanpa network dependency
+- Gunakan `java.time`/desugaring untuk date/time dan timezone
+- Timezone masjid eksplisit
+- Countdown = target absolute time - current time
 
 ### Testing
-- Vitest untuk unit/domain tests
-- React Testing Library untuk component behavior
-- Playwright untuk end-to-end dan visual state flows
+- JUnit untuk domain/unit tests
+- kotlinx-coroutines-test
+- Room in-memory tests
+- Compose UI tests
+- Android instrumented tests untuk pairing/transfer kritis
 
-### Quality
-- ESLint
-- Prettier
-- TypeScript `strict: true`
-- GitHub Actions: lint + typecheck + test + build
-
-## Monorepo target
+## Struktur project target
 
 ```text
-apps/
-  display/       # fullscreen TV app
-  admin/         # mobile-first admin
-packages/
-  domain/        # state machine, prayer rules, types
-  ui/            # shared primitive/token; jangan paksa layout TV=Admin
-  config/        # schemas/default config
-  prayer/        # calculation adapter
-  storage/       # local persistence/sync contracts
-docs/            # SSOT
+app-tv/
+app-admin/
+core/
+  domain/
+  prayer/
+  database/
+  protocol/
+  network-local/
+  media/
+  designsystem/
+docs/
 ```
 
 ## Dependency direction
 
-`apps -> packages`
+- `app-tv` dan `app-admin` bergantung pada module `core` yang diperlukan.
+- `core:domain` tidak bergantung pada Android UI.
+- `core:protocol` mendefinisikan message/DTO/version contract HP ↔ TV.
+- `core:network-local` mengimplementasikan discovery, pairing, transport.
+- `core:database` berisi Room entities/DAO/migration.
+- `core:prayer` tidak membutuhkan network.
 
-`domain` tidak boleh mengimpor React, browser storage, Supabase, atau UI.
+## TV runtime
 
-`prayer` menghasilkan domain-compatible schedule.
+1. Start Android TV app.
+2. Load konfigurasi lokal dari Room.
+3. Resolve waktu/tanggal/timezone masjid.
+4. Hitung/load jadwal sholat lokal.
+5. Jalankan display state resolver.
+6. Render fullscreen.
+7. Advertise local service untuk Admin App bila LAN tersedia.
+8. Terima config/media hanya dari admin yang sudah paired.
 
-`storage` mengimplementasikan interface persistence/sync; domain tidak mengetahui IndexedDB/Supabase.
+Tidak adanya LAN/internet tidak boleh menghentikan display setelah setup selesai.
 
-## Display runtime
+## Pairing model
 
-1. Boot shell.
-2. Load last-known validated config dari IndexedDB.
-3. Resolve timezone/current date.
-4. Load/calculate schedule.
-5. Start state engine.
-6. Render state.
-7. Jika online, sync config/content di background.
-8. Persist data valid baru secara atomik.
+TV menampilkan QR pairing berisi data bootstrap minimum seperti device identifier, local endpoint hint, protocol version, dan one-time pairing secret. Admin App scan QR, menemukan/menghubungi TV di LAN, melakukan handshake, lalu menyimpan trusted device relationship.
 
-## Deployment target
+Setelah pairing pertama, Admin App menggunakan NSD/mDNS untuk menemukan kembali TV meski alamat IP DHCP berubah.
 
-### Development
-Browser desktop dengan viewport preset 1920x1080 dan dev state switcher.
+## Security boundary
 
-### Production MVP
-PWA hosted HTTPS + fullscreen/kiosk launcher pada device. Cache app shell dengan service worker. Device dapat reboot dan kembali ke display tanpa interaksi rutin.
+- Hanya perangkat paired yang boleh mengubah config/media.
+- Pairing secret harus one-time/berumur pendek.
+- Endpoint mutasi membutuhkan credential hasil pairing.
+- Validate seluruh payload sebelum persist.
+- Batasi MIME type dan ukuran media.
+- Nama file dari client tidak boleh dipakai langsung sebagai filesystem path.
+- TV tidak membuka administrative endpoint ke internet.
 
-### Future native wrapper
-Jika Android TV membutuhkan autostart/device APIs, bungkus Display dengan Capacitor/native WebView tanpa memindahkan domain logic.
+## Deployment
 
-## Security boundaries
+TV App didistribusikan sebagai APK Android TV/STB. Admin App sebagai APK Android phone. Keduanya harus usable tanpa akun dan tanpa layanan server.
 
-- Display device mendapatkan identifier/token terbatas; bukan admin credential.
-- Admin authentication hanya berada pada Admin App.
-- QRIS MVP adalah media/identifier konfigurasi, bukan pemrosesan transaksi.
-- Config dari remote harus lolos Zod validation sebelum mengganti last-known-good config.
+## Non-goals arsitektur
 
-## Architectural non-goals
+- Web/PWA
+- React/TypeScript runtime
+- Supabase
+- Cloudflare
+- Backend/server internet
+- Cloud database/storage
+- Remote control dari luar LAN
+- Login/account online
+- Sinkronisasi internet
+- Ketergantungan prayer-time API
 
-- Microservices pada MVP.
-- Redux/global event bus besar.
-- Business logic di component React.
-- Cloud dependency untuk menentukan state sholat.
-- Mengambil prayer time API setiap menit.
+Jika requirement masa depan membutuhkan cloud, itu adalah proyek/keputusan arsitektur baru dan **tidak boleh dipersiapkan secara spekulatif dalam MVP ini**.
