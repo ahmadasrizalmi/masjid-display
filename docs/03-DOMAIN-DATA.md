@@ -4,89 +4,99 @@
 
 ### MosqueConfig
 
-```ts
-type MosqueConfig = {
-  mosqueId: string
-  name: string
-  cityLabel?: string
-  latitude: number
-  longitude: number
-  timezone: string
-  hijriAdjustmentDays: number
-  prayerMethod: string
-  asrMethod: string
-  prayerOffsetsMinutes: Partial<Record<PrayerName, number>>
-  iqamahMinutes: Partial<Record<PrayerName, number>>
-  friday: FridayConfig
-  branding: BrandingConfig
-}
+```kotlin
+data class MosqueConfig(
+    val mosqueId: String,
+    val name: String,
+    val cityLabel: String?,
+    val latitude: Double,
+    val longitude: Double,
+    val timezone: String,
+    val hijriAdjustmentDays: Int,
+    val prayerMethod: String,
+    val asrMethod: String,
+    val prayerOffsetsMinutes: Map<PrayerName, Int>,
+    val iqamahMinutes: Map<PrayerName, Int>,
+    val friday: FridayConfig,
+    val branding: BrandingConfig
+)
 ```
 
 ### PrayerName
 
-`fajr | dhuhr | asr | maghrib | isha`
+`FAJR | DHUHR | ASR | MAGHRIB | ISHA`
 
-`sunrise` boleh tampil sebagai informasi tetapi **bukan prayer state** dan tidak memicu adzan/iqamah.
+Sunrise/Syuruq boleh ditampilkan sebagai informasi tetapi bukan prayer state dan tidak memicu adzan/iqamah.
 
 ### DailyPrayerSchedule
 
-Menyimpan local date, timezone, calculated/raw prayer times, corrected prayer times, dan source metadata. Corrected time adalah waktu yang digunakan state engine.
+Menyimpan local date, timezone, raw/calculated times dan corrected prayer times. Corrected time digunakan state engine.
 
 ### Announcement
 
-Minimal: `id`, `title?`, `body`, `activeFrom?`, `activeUntil?`, `priority`, `enabled`.
+Minimal: id, title opsional, body, activeFrom/activeUntil opsional, priority, enabled.
 
-### FridayConfig
+### MediaItem
 
-Minimal: enabled, Friday-specific display window, khutbah/jumuah time opsional, petugas opsional.
+Minimal: id, local filename internal, media type, byte size, checksum, width/height bila gambar, createdAt, enabled. Jangan menyimpan arbitrary client filesystem path.
 
-## Prayer time pipeline
+### PairedAdmin
+
+Identitas trusted Admin App dan credential metadata yang diperlukan local protocol. Secret sensitif disimpan menggunakan mekanisme Android yang sesuai, bukan plain UI preference.
+
+## Prayer pipeline
 
 ```text
 coordinates + timezone + method
           ↓
- calculation adapter
+ local prayer calculator
           ↓
- raw prayer schedule
+ raw schedule
           ↓
- per-prayer correction offsets
+ correction offsets
           ↓
  canonical corrected schedule
           ↓
  display state engine
 ```
 
-Hanya canonical corrected schedule yang digunakan untuk transition boundary.
+Tidak ada network/API call pada pipeline.
 
 ## Time rules
 
-- Semua timestamp internal harus unambiguous.
-- UI menampilkan waktu lokal masjid.
-- Timezone berasal dari konfigurasi masjid, bukan timezone browser/device secara implisit.
-- Pergantian hari memicu pembuatan/load schedule tanggal berikutnya.
-- Clock drift device adalah risiko; sinkronisasi waktu OS/NTP direkomendasikan pada deployment.
+- Gunakan `java.time` types yang sesuai.
+- Timezone masjid eksplisit dan valid.
+- Jangan mengandalkan timezone device secara implisit.
+- Pergantian tanggal lokal masjid menghasilkan schedule baru.
+- Countdown dihitung dari absolute target.
 
 ## Iqamah
 
-Iqamah disimpan sebagai durasi menit setelah prayer time untuk setiap prayer. Target iqamah dihitung sebagai prayer timestamp + configured duration.
+Target = corrected prayer time + configured iqamah minutes. Nilai 0 berarti skip countdown sesuai state machine.
 
-Durasi 0 berarti behavior harus eksplisit; MVP: skip countdown dan masuk state PRAYER sesuai aturan state machine.
+## Hijri
 
-## Hijri date
+Informasional dan memiliki adjustment lokal terbatas. Adjustment tidak mengubah prayer calculation.
 
-Hijri display adalah informational. Admin dapat memberi adjustment hari (-2..+2 pada MVP). Perubahan Hijri tidak mengubah prayer calculation.
+## Persistence ownership
+
+TV Room database adalah source of truth operasional untuk konfigurasi/display. Admin App dapat menyimpan data UI/perangkat paired sendiri, tetapi TV tidak bergantung pada database HP untuk terus berjalan.
 
 ## Validation
 
-Config invalid tidak boleh mengganti last-known-good config. Nilai penting yang divalidasi:
+Sebelum transaction persist:
 
 - latitude -90..90
 - longitude -180..180
-- valid IANA timezone
-- prayer offsets dalam range aman yang ditentukan UI
-- iqamah duration non-negative dan memiliki maximum UI
-- date ranges announcement konsisten
+- timezone valid
+- prayer offset dalam batas UI
+- iqamah non-negative dan dalam batas UI
+- announcement range konsisten
+- protocol payload version didukung
+- media type/size/checksum valid
+
+Payload invalid ditolak dan konfigurasi TV yang valid tidak berubah.
 
 ## Versioning
 
-Persisted config memiliki `schemaVersion`. Migration harus eksplisit ketika schema berubah. Jangan silently membaca struktur lama sebagai struktur baru.
+Room schema menggunakan migration eksplisit. Local protocol memiliki protocol version terpisah dari database schema version. Jangan menganggap keduanya sama.
