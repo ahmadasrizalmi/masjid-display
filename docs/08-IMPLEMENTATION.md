@@ -2,148 +2,171 @@
 
 ## Rule of execution
 
-Jangan generate seluruh aplikasi dalam satu prompt/commit. Implementasi dilakukan per vertical slice dan setiap slice harus runnable/testable.
+Jangan generate seluruh aplikasi dalam satu task. Implementasi per vertical slice, runnable dan testable. Tidak boleh menambahkan backend/cloud/web stack.
 
-## Phase 0 — Foundation
+## Phase 0 — Android Foundation
 
-- pnpm workspace
-- TypeScript strict
-- apps/display
-- apps/admin
-- packages/domain/config/prayer/storage/ui
-- lint/typecheck/test/build scripts
-- CI
+- Gradle Kotlin DSL multi-module project
+- `app-tv`
+- `app-admin`
+- `core:domain`
+- `core:prayer`
+- `core:database`
+- `core:protocol`
+- `core:network-local`
+- `core:media`
+- `core:designsystem`
+- Kotlin/Compose baseline
+- lint/test/build CI
 
-**Done:** clean install + lint + typecheck + test + build berhasil.
+**Done:** kedua APK debug dapat dibuild; unit test berjalan.
 
-## Phase 1 — Domain clock & prayer schedule
+## Phase 1 — Prayer Domain
 
-- canonical types
-- prayer adapter
+- canonical Kotlin models
+- prayer calculation lokal
 - correction offsets
-- timezone handling
+- timezone
 - daily schedule
+- iqamah target calculation
 - unit tests
 
-**Done:** fixture location/date menghasilkan schedule deterministic dan corrected schedule teruji.
+**Done:** fixture location/date menghasilkan schedule deterministic tanpa network.
 
-## Phase 2 — State engine
+## Phase 2 — Display State Engine
 
-- `resolveDisplayState`
+- pure Kotlin state resolver
 - approaching threshold
 - adhan duration
 - iqamah target
 - prayer duration
-- Friday override skeleton
+- Friday override
 - boundary tests
 
-**Done:** seluruh transition memiliki test detik sebelum/saat/setelah boundary.
+**Done:** transition diuji sebelum/saat/setelah boundary.
 
-## Phase 3 — TV Focus UI
+## Phase 3 — Android TV Focus UI
 
-- 1920×1080 design tokens
+- fullscreen Compose TV
 - Normal
 - Approaching
 - Adhan
 - Iqamah
 - Prayer
+- Friday
 - Information
-- offline indicator
-- dev state/clock switcher
+- dev-only clock/state preview
 
-**Done:** seluruh state dapat dipreview tanpa backend dan lolos screenshot review 720p/1080p/4K viewport.
+**Done:** seluruh state dapat dipreview pada emulator/perangkat tanpa Admin App.
 
-## Phase 4 — Local persistence/offline
+## Phase 4 — TV Room Persistence
 
-- Dexie schema
-- config validation
-- last-known-good
-- schedule cache
-- service worker/app shell
-- boot scenarios
+- Room entities/DAO
+- migrations
+- config repository
+- media metadata
+- boot configured/unconfigured
+- runtime observe config
 
-**Done:** reload offline mempertahankan display valid.
+**Done:** restart app/device mempertahankan konfigurasi dan display dapat berjalan tanpa network.
 
-## Phase 5 — Admin local MVP
+## Phase 5 — Local Discovery & Secure Pairing
 
-- onboarding
-- mosque/location settings
-- offsets
-- iqamah settings
-- content
-- appearance
-- state preview
+- TV NSD advertise
+- Admin NSD discovery
+- pairing QR
+- one-time secret
+- trusted device credential
+- protocol version negotiation
+- reconnect setelah IP DHCP berubah
 
-**Done:** admin config dapat menghasilkan config schema valid dan preview display.
+**Done:** HP dapat pair dan reconnect ke TV tanpa mengetik IP.
 
-## Phase 6 — Remote backend
+## Phase 6 — Admin APK
 
-- Supabase project/schema
-- admin auth
-- mosque/device records
-- config/content sync
-- asset storage
-- device pairing/token
+- paired device home
+- mosque/location
+- prayer correction
+- iqamah
+- Friday
+- announcements
+- display appearance
+- status
+- preview
 
-**Done:** perubahan admin dapat diterima display, divalidasi, dipersist, dan survive offline.
+**Done:** perubahan dari Admin dikirim via LAN, divalidasi TV, tersimpan Room, dan langsung memengaruhi runtime yang relevan.
 
-## Phase 7 — Hardening
+## Phase 7 — Local Media Transfer
 
-- E2E
-- visual regression critical states
-- error recovery
-- kiosk/autostart deployment notes
+- Android Photo Picker
+- multi-select
+- upload session
+- streaming LAN
+- temporary file
+- checksum/validation
+- atomic save
+- progress
+- retry per-file
+- delete media
+- storage-full handling
+
+**Done:** beberapa foto dapat dikirim HP → TV tanpa internet dan kegagalan satu file tidak merusak file lain.
+
+## Phase 8 — Hardening
+
+- pairing/security tests
+- database migration tests
+- UI tests
+- transfer interruption tests
+- large image/memory tests
+- process death/restart
+- TV reboot/autostart behavior
 - accessibility/contrast
-- performance/memory soak
+- performance soak
 
-## Suggested first file boundaries
+## Target source boundaries
 
 ```text
-packages/domain/src/types.ts
-packages/domain/src/state/resolveDisplayState.ts
-packages/domain/src/state/resolveDisplayState.test.ts
-packages/prayer/src/calculateSchedule.ts
-packages/config/src/schema.ts
-apps/display/src/screens/*
-apps/display/src/dev/StateSwitcher.tsx
+app-tv/src/main/...
+app-admin/src/main/...
+core/domain/src/main/...
+core/prayer/src/main/...
+core/database/src/main/...
+core/protocol/src/main/...
+core/network-local/src/main/...
+core/media/src/main/...
+core/designsystem/src/main/...
 ```
 
 ## AI generation protocol
 
-Setiap generation task harus menyebut:
+Setiap task harus menyebut:
 
-- file/directory scope
+- phase
+- file/module scope
 - dokumen SSOT yang wajib dibaca
 - acceptance criteria
-- tests yang harus dibuat/diupdate
-- hal yang tidak boleh diubah
+- test yang wajib dibuat/diupdate
+- hal yang dilarang diubah
 
-Contoh task yang baik:
+Contoh:
 
-> Implement Phase 2 state resolver only. Read docs/00-SSOT-INDEX.md, docs/03-DOMAIN-DATA.md, docs/04-STATE-MACHINE.md. Do not build UI. Add boundary unit tests for Dhuhr flow.
+> Implement Phase 2 state resolver only in core:domain. Read docs/00-SSOT-INDEX.md, docs/03-DOMAIN-DATA.md, docs/04-STATE-MACHINE.md. Pure Kotlin only. No Android UI, network, database, backend, or cloud dependencies. Add boundary unit tests.
 
-Contoh task buruk:
+## Definition of Done
 
-> Build the whole Masjid Display app according to docs.
+Task belum selesai jika:
 
-## Definition of Done umum
-
-Sebuah task belum selesai jika:
-
-- hanya UI tanpa domain behavior yang diperlukan,
-- ada type error/lint failure,
-- business rule baru tidak ditest,
-- behavior menyimpang dari SSOT,
-- offline-critical logic membutuhkan network tanpa alasan,
+- business rule baru tanpa test,
+- build/test gagal,
+- logic domain ditempel di Composable,
+- TV membutuhkan HP agar state prayer terus berjalan,
+- IP address di-hardcode,
+- media/config dikirim melalui internet,
+- dependency backend/cloud/web ditambahkan,
+- behavior bertentangan dengan SSOT,
 - TODO menggantikan acceptance criteria utama.
 
 ## Change management
 
-Jika keputusan berubah:
-
-1. Update dokumen domain SSOT terkait.
-2. Update test expectation.
-3. Implement code.
-4. Catat breaking/config migration jika ada.
-
-Dengan urutan ini dokumentasi tetap menjadi blueprint aktual, bukan dokumentasi yang ditulis setelah code.
+Keputusan arsitektur harus diubah di SSOT terlebih dahulu, baru code/test. Jangan meninggalkan arsitektur lama sebagai fallback atau komentar alternatif karena dapat membingungkan code generator.
