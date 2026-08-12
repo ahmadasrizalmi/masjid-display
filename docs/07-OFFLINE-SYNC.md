@@ -1,75 +1,124 @@
-# 07 — Offline & Sync
+# 07 — Local Persistence, Pairing & Transfer
 
 ## Core rule
 
-Internet adalah enhancement untuk administrasi/sinkronisasi. Internet **bukan dependency untuk menentukan kapan sholat/adzan/iqamah state terjadi**.
+Sistem **tidak memiliki cloud sync**. Semua operasi produk terjadi pada perangkat Android dan LAN lokal.
 
-## Last-known-good model
+TV App adalah source of truth runtime. Admin App adalah configurator/client lokal.
 
-Display menyimpan:
+## TV persistence
 
-- validated mosque config
+TV menyimpan secara lokal:
+
+- mosque config
 - prayer calculation settings
-- schedule cache
-- active announcements/content metadata
-- branding assets yang diperlukan
-- schema versions
-- last successful sync timestamp
+- corrected prayer settings
+- iqamah settings
+- Friday settings
+- announcements
+- display/theme config
+- paired admin identities/credentials
+- media metadata
+- media files
+- schema version
 
-Remote payload baru hanya mengganti data aktif setelah validation sukses.
+Data terstruktur: Room/SQLite. File media: Android internal app storage.
 
-## Boot matrix
+## Admin persistence
 
-### Online + local cache
-Render cache segera, sync background, lalu swap data secara aman jika remote valid.
+Admin menyimpan data yang diperlukan untuk UX admin dan hubungan perangkat, termasuk daftar TV paired dan credential lokal. Data Admin bukan dependency agar TV terus beroperasi.
 
-### Offline + local cache
-Render cache dan hitung schedule lokal. Tampilkan offline indicator kecil.
+## Boot TV
 
-### Online + no cache
-Pair/setup atau fetch initial config; setelah valid, persist lalu start display.
+### Sudah dikonfigurasi
+Load Room → hitung jadwal → resolve state → render. Network tidak diperlukan.
 
-### Offline + no cache
-Tampilkan setup/recovery error. Jangan membuat jadwal berdasarkan lokasi asumsi.
+### Belum dikonfigurasi
+Tampilkan setup/pairing screen. Admin App melakukan konfigurasi awal melalui LAN.
 
-## Service worker
+### LAN tidak tersedia setelah setup
+Display tetap berjalan normal. Fitur edit/transfer dari HP sementara tidak tersedia sampai LAN tersedia kembali.
 
-Cache static app shell dan immutable assets. Jangan menganggap service worker sebagai database konfigurasi.
+## Discovery
 
-## IndexedDB
+TV advertise service lokal via Android NSD/mDNS. Admin App mencari service tersebut dan mencocokkannya dengan trusted device identifier.
 
-Gunakan transactional persistence untuk config/schedule/content metadata. Simpan schema version dan migration.
+IP address bukan identitas permanen dan tidak boleh menjadi satu-satunya key perangkat.
 
-## Sync strategy MVP
+## Pairing
 
-- Sync saat boot jika online.
-- Periodic background refresh dengan interval konservatif.
-- Sync setelah reconnect.
-- Admin-triggered change dapat menggunakan realtime/polling di fase backend, tetapi Display tetap memvalidasi payload.
+1. TV membuat one-time pairing session.
+2. TV menampilkan QR + kode fallback.
+3. Admin scan QR.
+4. Admin menemukan/menghubungi endpoint lokal TV.
+5. Handshake memverifikasi one-time secret + protocol version.
+6. TV menerbitkan credential trusted admin.
+7. Pairing session ditutup dan secret tidak dapat dipakai ulang.
 
-## Conflict policy
+## Local protocol
 
-Server adalah source of truth untuk admin-managed configuration setelah pairing. Display mempertahankan last-known-good local copy sebagai runtime fallback.
+Protocol memiliki `protocolVersion` dan message contract eksplisit. Minimal capability:
 
-Local runtime state seperti current countdown tidak di-upload sebagai configuration.
+```text
+GetDeviceInfo
+GetStatus
+GetConfig
+UpdateMosqueConfig
+UpdatePrayerSettings
+UpdateIqamahSettings
+UpdateFridaySettings
+ListAnnouncements
+UpsertAnnouncement
+DeleteAnnouncement
+ListMedia
+UploadMedia
+DeleteMedia
+UpdateDisplaySettings
+```
 
-## Assets
+Mutasi harus mengembalikan hasil sukses/error yang dapat ditampilkan Admin App.
 
-Logo/QR/background yang diperlukan harus dicache setelah config diterima. Jika asset baru gagal diunduh, jangan hapus asset lama yang masih valid.
+## Media transfer
 
-## Connectivity indicator
+Flow:
 
-Indicator offline kecil pada NORMAL/INFORMATION. Jangan menampilkan banner besar selama prayer states selama core data masih valid.
+```text
+Android Photo Picker
+  → Admin validates basic metadata
+  → request upload session
+  → stream bytes over LAN
+  → TV writes temporary file
+  → verify size/type/checksum
+  → atomic move to final local storage
+  → persist Room metadata
+  → response success
+```
+
+Jika transfer gagal, temporary file dibersihkan. File existing tidak boleh rusak karena upload baru gagal.
+
+## Transfer UX
+
+- Bisa memilih beberapa foto.
+- Tampilkan progress per file dan total.
+- Retry file gagal tanpa mengulang semua file yang sukses.
+- TV tidak perlu membuka file picker.
+- Admin tidak perlu mengetik IP address pada flow normal.
+- Error harus membedakan: TV tidak ditemukan, beda jaringan/tidak reachable, pairing invalid, storage penuh, file unsupported, transfer terputus.
+
+## File constraints
+
+MVP menerima format gambar yang ditentukan implementasi Android (minimal JPEG/PNG/WebP yang tervalidasi). Tetapkan batas ukuran dan resolusi yang masuk akal sebelum implementasi transfer. TV boleh melakukan decode/resize terkontrol untuk mencegah memory pressure.
+
+## Local configuration update
+
+TV menerima payload → validate → transaction Room → response sukses → runtime observe perubahan via Flow → recalculate bila perubahan memengaruhi prayer schedule.
+
+Payload invalid tidak boleh mengganti konfigurasi valid yang sedang berjalan.
 
 ## Recovery
 
-Jika persisted data corrupt:
-
-1. Reject record invalid.
-2. Coba last-known-good/version sebelumnya bila tersedia.
-3. Jika tidak ada config valid, masuk ERROR/setup recovery.
-4. Log diagnostic tanpa menampilkan detail teknis ke jamaah.
+Jika database record invalid/corrupt, jangan menebak konfigurasi. Masuk recovery/setup yang jelas untuk pengurus. Error teknis dicatat ke log aplikasi, bukan ditampilkan sebagai stack trace pada layar jamaah.
 
 ## Clock reliability
 
-Offline operation tetap bergantung pada clock device yang benar. Deployment guide harus menganjurkan automatic date/time + timezone/NTP. Aplikasi tidak boleh diam-diam mengganti timezone masjid dengan timezone device.
+Display tetap bergantung pada clock perangkat yang benar. TV harus menggunakan timezone masjid dari konfigurasi untuk perhitungan/display. Pengaturan automatic date/time perangkat direkomendasikan, tetapi internet bukan bagian dari protocol aplikasi.
