@@ -30,10 +30,6 @@ data class PrayerTimes(
     }
 }
 
-/**
- * Canonical daily schedule. Raw/calculated values are preserved for audit/debug while corrected
- * values are the only prayer times consumed by the display state engine.
- */
 data class DailyPrayerSchedule(
     val date: LocalDate,
     val zoneId: ZoneId,
@@ -41,7 +37,6 @@ data class DailyPrayerSchedule(
     val corrected: PrayerTimes,
 ) {
     fun correctedAt(prayer: PrayerName): ZonedDateTime = ZonedDateTime.of(date, corrected[prayer], zoneId)
-
     fun sunriseAt(): ZonedDateTime = ZonedDateTime.of(date, corrected.sunrise, zoneId)
 }
 
@@ -56,6 +51,9 @@ data class PrayerCalculationConfig(
     init {
         require(latitude in -90.0..90.0) { "Latitude must be within -90..90" }
         require(longitude in -180.0..180.0) { "Longitude must be within -180..180" }
+        require(offsetsMinutes.values.all { it in -120..120 }) {
+            "Prayer correction offsets must be within -120..120 minutes"
+        }
     }
 }
 
@@ -64,7 +62,6 @@ enum class AsrMethod(val shadowFactor: Int) {
     HANAFI(2),
 }
 
-/** Calculation methods are explicit local parameters; no remote prayer API is involved. */
 data class PrayerCalculationMethod(
     val fajrAngle: Double,
     val ishaAngle: Double? = null,
@@ -74,13 +71,12 @@ data class PrayerCalculationMethod(
         require(fajrAngle in 0.0..30.0)
         require(ishaAngle == null || ishaAngle in 0.0..30.0)
         require(ishaIntervalMinutes == null || ishaIntervalMinutes >= 0)
-        require(ishaAngle != null || ishaIntervalMinutes != null) {
-            "Either ishaAngle or ishaIntervalMinutes must be configured"
+        require((ishaAngle == null) xor (ishaIntervalMinutes == null)) {
+            "Configure exactly one Isha rule: angle or interval"
         }
     }
 
     companion object {
-        /** Indonesian Ministry of Religious Affairs convention commonly used locally. */
         val KEMENAG_INDONESIA = PrayerCalculationMethod(fajrAngle = 20.0, ishaAngle = 18.0)
     }
 }
