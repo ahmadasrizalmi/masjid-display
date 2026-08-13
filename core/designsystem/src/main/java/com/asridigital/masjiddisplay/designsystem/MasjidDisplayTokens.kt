@@ -59,6 +59,7 @@ object TvDimensions {
 
 object TvTypography {
     val Clock = 120.sp
+    val SidebarClock = 96.sp
     val MosqueName = 44.sp
     val Location = 26.sp
     val DatePrimary = 30.sp
