@@ -11,23 +11,23 @@ Masjid Display terdiri dari dua APK:
 - **Masjid Display TV** — dipasang di Android TV/STB, menampilkan jadwal dan menjalankan seluruh state sholat.
 - **Masjid Display Admin** — dipasang di HP Android pengurus untuk konfigurasi dan transfer media langsung ke TV melalui Wi-Fi/LAN lokal.
 
-Tidak ada akun online, web admin, backend internet, database cloud, atau cloud storage.
+Tidak ada akun online, web admin, backend internet, database cloud, atau cloud storage untuk operasi aplikasi.
+
+## Lisensi: Sekali Bayar, Offline Selamanya
+
+Masjid Display dibuat dengan harapan dapat memberi manfaat bagi masjid dan jamaah serta menjadi bagian dari amal yang terus mengalir. Pada saat yang sama, pengembangan aplikasi membutuhkan waktu, tenaga, perangkat, dan biaya hidup. Karena itu aplikasi menggunakan **lisensi sekali bayar**, tanpa langganan bulanan.
+
+Serial number resmi didistribusikan melalui Asri Digital, tetapi **validasi serial dilakukan sepenuhnya di perangkat**. Aplikasi tidak bergantung pada server lisensi dan tidak membutuhkan internet untuk aktivasi maupun penggunaan sehari-hari.
+
+Kami mengharapkan pengguna yang mampu memperoleh lisensi secara resmi sebagai bentuk dukungan terhadap keberlanjutan pengembangan. Sistem ini sengaja tidak menggunakan DRM agresif. Apabila aplikasi pada akhirnya digunakan lebih luas karena serial dibagikan atau mekanisme lisensinya dilewati, kami tetap berharap manfaat yang diterima masjid dan jamaah menjadi kebaikan serta amal jariyah. Rezeki dapat datang melalui banyak jalan; lisensi ini adalah salah satu ikhtiar agar pengembangan dapat terus berjalan sambil memenuhi kebutuhan sehari-hari.
+
+Ketentuan dan filosofi lengkap: [`LICENSE-APP.md`](LICENSE-APP.md).
 
 ## Visual UI Blueprint
 
-Visual concept sudah dibuat sebagai companion untuk wireframe tekstual. Implementasi harus memperlakukan visual sebagai **arah desain**, sedangkan behavior, hierarchy, dan state tetap mengikuti dokumen SSOT.
+Visual concept digunakan sebagai companion untuk wireframe tekstual. Implementasi harus memperlakukan visual sebagai **arah desain**, sedangkan behavior, hierarchy, dan state tetap mengikuti dokumen SSOT.
 
-Visual mencakup:
-
-- TV NORMAL: identitas masjid, jam besar, next prayer, countdown, jadwal harian, ticker.
-- TV ADHAN: satu focal point berupa nama sholat + waktu adzan.
-- TV IQAMAH: countdown besar, termasuk emphasis 30 detik terakhir.
-- TV PRAYER: layar minimal untuk merapatkan/meluruskan shaf.
-- TV INFORMATION: kajian/pengumuman dengan prayer context tetap tersedia.
-- TV DONATION/QRIS: hanya pada state yang mengizinkan.
-- TV FRIDAY: presentation khusus Jumat.
-- Variasi tema visual tanpa mengubah hierarchy informasi.
-- Admin Home, Jadwal, Pengumuman, Media, Photo Picker, transfer progress, daftar perangkat, QR pairing, dan Pengaturan.
+Visual mencakup state TV utama serta flow Admin seperti Jadwal, Pengumuman, Media, Photo Picker, transfer progress, daftar perangkat, QR pairing, dan Pengaturan.
 
 ### Aturan membaca visual
 
@@ -38,17 +38,16 @@ Visual mencakup:
 5. Teks kecil/detail hasil mockup boleh disempurnakan saat implementasi; struktur dan focal point yang disetujui harus dipertahankan.
 6. Jangan menambahkan konsep cloud/online dari interpretasi visual.
 
-> Asset visual target repo: `docs/assets/masjid-display-ui-blueprint.png`. Jika asset belum ada pada checkout, gunakan dokumen UI sebagai SSOT dan jangan membuat desain alternatif sendiri.
-
 ## Pengalaman utama
 
 1. Install/buka TV App.
-2. TV menampilkan QR pairing.
-3. Buka Admin App di HP pada jaringan lokal yang sama.
-4. Scan QR dan pair.
-5. Atur identitas masjid, lokasi, jadwal, koreksi, iqamah, Jumat, tampilan, dan pengumuman.
-6. Pilih foto dari HP dan kirim langsung ke TV melalui LAN.
-7. TV menyimpan semuanya lokal dan terus berjalan walau HP tidak terhubung.
+2. Aktivasi menggunakan serial number valid secara offline.
+3. TV menampilkan QR pairing.
+4. Buka Admin App di HP pada jaringan lokal yang sama.
+5. Scan QR dan pair.
+6. Atur identitas masjid, lokasi, jadwal, koreksi, iqamah, Jumat, tampilan, dan pengumuman.
+7. Pilih foto dari HP dan kirim langsung ke TV melalui LAN.
+8. TV menyimpan semuanya lokal dan terus berjalan walau HP tidak terhubung.
 
 ## Tech stack
 
@@ -79,6 +78,7 @@ Visual mencakup:
 | `docs/06-UI-ADMIN.md` | Wireframe/flow Admin APK |
 | `docs/07-OFFLINE-SYNC.md` | Persistence lokal, pairing, protocol, transfer media |
 | `docs/08-IMPLEMENTATION.md` | Urutan implementasi dan DoD |
+| `LICENSE-APP.md` | Filosofi dan ketentuan lisensi aplikasi |
 
 ## MVP
 
@@ -87,12 +87,11 @@ Visual mencakup:
 - Countdown sholat dan iqamah
 - Masehi + Hijriah
 - State Adzan/Iqamah/Sholat/Jumat
-- Pengumuman
-- QRIS opsional
+- Pengumuman dan QRIS opsional
 - Android TV fullscreen 16:9
 - Admin APK Android
-- Pairing QR
-- Auto-discovery TV di LAN
+- Offline lifetime serial activation
+- Pairing QR dan auto-discovery TV di LAN
 - Transfer beberapa foto HP → TV
 - Local SQLite/Room persistence
 - Tidak membutuhkan internet untuk operasi produk
