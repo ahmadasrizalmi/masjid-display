@@ -16,15 +16,20 @@ object MasjidDisplayColors {
     val Warning = Color(0xFFD99518)
     val Error = Color(0xFFB3261E)
     val Success = Color(0xFF176B45)
+
+    val TvFocusBg = Color(0xFFF4EFE4)
+    val TvFocusSurface = Color(0xFFFFFDF8)
+    val TvFocusText = Color(0xFF171A17)
+    val TvFocusSecondary = Color(0xFF62665F)
+    val TvFocusAccent = Color(0xFFB9842C)
+    val TvFocusPattern = Color(0x12B9842C)
 }
 
 object TvDimensions {
-    // 1920x1080 SSOT baseline. Critical header text stays >= 5% from physical edge.
     val HeaderHeight = 170.dp
     val HeaderHorizontalPadding = 96.dp
     val HeaderVerticalPadding = 24.dp
 
-    // HORIZONTAL_MEDIA prayer bar is 190px/dp high at the 1080p baseline.
     val PrayerBarHeight = 190.dp
     val PrayerCellWidth = 320.dp
     val PrayerCellHeight = PrayerBarHeight
@@ -33,15 +38,21 @@ object TvDimensions {
     val PrayerCellDividerWidth = 1.dp
     val ActiveIndicatorHeight = 6.dp
 
-    // SIDEBAR_MEDIA baseline: 430px sidebar, 180px header, 100px info bar.
-    // Remaining 800px is shared by six equal rows; the parent layout owns exact distribution.
+    // 180 header + 6*133 prayer rows + 1px separators + 100 info bar fits 1080 baseline.
     val PrayerSidebarWidth = 430.dp
     val PrayerSidebarHeaderHeight = 180.dp
     val PrayerSidebarInfoBarHeight = 100.dp
-    val PrayerSidebarRowMinHeight = 133.dp
+    val PrayerSidebarRowHeight = 133.dp
     val PrayerSidebarRowHorizontalPadding = 28.dp
     val PrayerSidebarActiveIndicatorWidth = 6.dp
     val PrayerSidebarDividerHeight = 1.dp
+
+    val FocusHorizontalSafeInset = 96.dp
+    val FocusVerticalSafeInset = 54.dp
+    val FocusContentMaxWidth = 1200.dp
+    val FocusSectionSpacing = 28.dp
+    val FocusAccentLineWidth = 120.dp
+    val FocusAccentLineHeight = 2.dp
 }
 
 object TvTypography {
@@ -56,4 +67,11 @@ object TvTypography {
     val PrayerSidebarLabel = 30.sp
     val PrayerSidebarTime = 40.sp
     val PrayerSidebarCountdown = 22.sp
+
+    val FocusStateLabel = 30.sp
+    val FocusPrimaryLabel = 72.sp
+    val FocusHeroValue = 184.sp
+    val FocusContextTime = 34.sp
+    val FocusSecondary = 30.sp
+    val FocusIcon = 56.sp
 }
