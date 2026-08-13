@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.room.Room
 import com.asridigital.masjiddisplay.database.ConfigRepository
@@ -29,9 +30,10 @@ class MainActivity : ComponentActivity() {
 /** No bootstrap mosque fixture: Room is the TV operational source of truth. */
 @Composable
 private fun TvRuntimeRoot() {
-    val database = remember {
+    val context = LocalContext.current.applicationContext
+    val database = remember(context) {
         Room.databaseBuilder(
-            androidx.compose.ui.platform.LocalContext.current.applicationContext,
+            context,
             MasjidDisplayDatabase::class.java,
             "masjid-display.db",
         ).build()
