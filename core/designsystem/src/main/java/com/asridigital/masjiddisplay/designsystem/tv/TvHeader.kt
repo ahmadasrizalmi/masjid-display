@@ -10,25 +10,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.material3.Text
 import com.asridigital.masjiddisplay.designsystem.MasjidDisplayColors
 import com.asridigital.masjiddisplay.designsystem.TvDimensions
 import com.asridigital.masjiddisplay.designsystem.TvTypography
 
 /**
- * Header untuk NORMAL TV layout.
+ * Header untuk NORMAL / HORIZONTAL_MEDIA TV layout.
  *
- * Pure presentation component: waktu/tanggal sudah diformat oleh caller.
- * Component ini sengaja tidak membaca clock, database, network, atau prayer domain.
+ * Pure presentation component: waktu dan tanggal sudah diformat oleh caller.
+ * Tidak membaca clock, database, network, atau prayer domain.
  */
 @Composable
 fun TvHeader(
@@ -52,10 +52,11 @@ fun TvHeader(
     ) {
         Text(
             text = currentTime,
-            modifier = Modifier.widthIn(min = 300.dp),
+            modifier = Modifier.widthIn(min = 320.dp),
             color = MasjidDisplayColors.TextPrimary,
             fontSize = TvTypography.Clock,
             fontWeight = FontWeight.Bold,
+            style = TextStyle(fontFeatureSettings = "tnum"),
             maxLines = 1,
         )
 
@@ -85,7 +86,7 @@ fun TvHeader(
         }
 
         Column(
-            modifier = Modifier.widthIn(min = 340.dp),
+            modifier = Modifier.widthIn(min = 360.dp),
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -95,6 +96,7 @@ fun TvHeader(
                 fontSize = TvTypography.DatePrimary,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End,
             )
             Text(
@@ -103,6 +105,7 @@ fun TvHeader(
                 fontSize = TvTypography.DateSecondary,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End,
             )
         }
