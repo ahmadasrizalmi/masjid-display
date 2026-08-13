@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:theme="@style/Theme.MasjidDisplay.Admin" android:label="Masjid Display Admin">
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:label="Masjid Display Admin"
+        android:theme="@style/Theme.MasjidDisplay.Admin"
+        android:usesCleartextTraffic="true">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

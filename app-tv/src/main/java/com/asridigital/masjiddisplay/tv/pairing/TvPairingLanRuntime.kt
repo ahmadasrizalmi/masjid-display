@@ -9,7 +9,7 @@ class TvPairingLanRuntime(
     private var started = false
 
     fun start(): Int {
-        if (started) return server.port
+        if (started) return requireNotNull(server.port)
         val port = server.start()
         try {
             advertiser.start(port)
