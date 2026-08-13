@@ -1,8 +1,21 @@
 <resources>
+    <color name="admin_background">#F6F7F5</color>
+    <color name="admin_surface">#FFFFFF</color>
+    <color name="admin_surface_muted">#EEF1ED</color>
+    <color name="admin_text_primary">#17201B</color>
+    <color name="admin_text_secondary">#68736D</color>
+    <color name="admin_divider">#DDE2DE</color>
+    <color name="admin_accent">#176B45</color>
+    <color name="admin_on_accent">#FFFFFF</color>
+    <color name="admin_warning">#D99518</color>
+    <color name="admin_error">#B3261E</color>
+
     <style name="Theme.MasjidDisplay.Admin" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:navigationBarColor">#F7F5EF</item>
-        <item name="android:statusBarColor">#F7F5EF</item>
+        <item name="android:navigationBarColor">@color/admin_background</item>
+        <item name="android:statusBarColor">@color/admin_background</item>
+        <item name="android:windowBackground">@color/admin_background</item>
+        <item name="android:colorAccent">@color/admin_accent</item>
     </style>
 </resources>
