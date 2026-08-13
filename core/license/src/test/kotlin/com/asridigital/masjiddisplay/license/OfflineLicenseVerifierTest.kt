@@ -1,5 +1,6 @@
 package com.asridigital.masjiddisplay.license
 
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -7,61 +8,68 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class OfflineLicenseVerifierTest {
-    private val config = LicenseVerifierConfig(productCode = "MASJID", verifierSalt = "ASRI-V1")
-    private val verifier = OfflineLicenseVerifier(config)
-    private val payload = LicensePayload(productCode = "MASJID", serialId = "AB12CD34")
+    // Non-production public key + pre-signed fixture. No private key or generator secret is stored here.
+    private val publicKey = "MCowBQYDK2VwAyEAb3vu+98LX2EWhWm028uH2hj/u+hj9cCajmQFoLZ/Nzg="
+    private val payloadPart = "MTpNQVNKSUQ6QUIxMkNEMzQ"
+    private val signaturePart = "fX6padcp_iSEHViWZim4QokU65cEuKX3BOqXJYfa-8N2aTy1LtwaDTrkMHH1xJj-hsuKZtpv1c5OzM26J08HAw"
+    private val validSerial = "$payloadPart.$signaturePart"
+    private val verifier = OfflineLicenseVerifier(LicenseVerifierConfig("MASJID", publicKey))
 
     @Test
-    fun validSerialIsAcceptedOffline() {
-        val serial = serialFor(payload)
-        val result = verifier.validate(serial)
-        assertEquals(payload, assertIs<LicenseValidationResult.Valid>(result).payload)
+    fun validPreSignedFixtureIsAcceptedOffline() {
+        val valid = assertIs<LicenseValidationResult.Valid>(verifier.validate(validSerial))
+        assertEquals(LicensePayload(1, "MASJID", "AB12CD34"), valid.payload)
     }
 
     @Test
-    fun tamperedSerialIsRejected() {
-        val valid = serialFor(payload)
-        val tampered = valid.replace("AB12CD34", "AB12CD35")
-        val invalid = assertIs<LicenseValidationResult.Invalid>(verifier.validate(tampered))
+    fun changedSignatureIsInvalid() {
+        val changed = "$payloadPart.${signaturePart.dropLast(1)}A"
+        val invalid = assertIs<LicenseValidationResult.Invalid>(verifier.validate(changed))
         assertEquals(LicenseValidationResult.Reason.SIGNATURE_MISMATCH, invalid.reason)
     }
 
     @Test
-    fun malformedSerialIsRejected() {
-        val invalid = assertIs<LicenseValidationResult.Invalid>(verifier.validate("not-a-license"))
-        assertEquals(LicenseValidationResult.Reason.MALFORMED, invalid.reason)
+    fun changedPayloadIsInvalid() {
+        val changedPayload = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("1:MASJID:AB12CD35".toByteArray(Charsets.US_ASCII))
+        val invalid = assertIs<LicenseValidationResult.Invalid>(verifier.validate("$changedPayload.$signaturePart"))
+        assertEquals(LicenseValidationResult.Reason.SIGNATURE_MISMATCH, invalid.reason)
     }
 
     @Test
-    fun wrongProductPayloadIsRejected() {
-        val otherPayload = LicensePayload(productCode = "OTHER", serialId = "AB12CD34")
-        val invalid = assertIs<LicenseValidationResult.Invalid>(verifier.validate(serialFor(otherPayload)))
+    fun malformedSerialOrEncodingIsInvalid() {
+        val malformed = assertIs<LicenseValidationResult.Invalid>(verifier.validate("not-a-license"))
+        assertEquals(LicenseValidationResult.Reason.MALFORMED, malformed.reason)
+        val badEncoding = assertIs<LicenseValidationResult.Invalid>(verifier.validate("***.$signaturePart"))
+        assertEquals(LicenseValidationResult.Reason.MALFORMED, badEncoding.reason)
+    }
+
+    @Test
+    fun invalidPayloadIsRejectedBeforeActivation() {
+        val wrongProduct = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("1:OTHER:AB12CD34".toByteArray(Charsets.US_ASCII))
+        val invalid = assertIs<LicenseValidationResult.Invalid>(verifier.validate("$wrongProduct.$signaturePart"))
         assertEquals(LicenseValidationResult.Reason.INVALID_PAYLOAD, invalid.reason)
     }
 
     @Test
-    fun invalidVerifierConfigurationIsRejectedDeterministically() {
-        val invalidVerifier = OfflineLicenseVerifier(LicenseVerifierConfig("bad product!", ""))
-        val invalid = assertIs<LicenseValidationResult.Invalid>(invalidVerifier.validate(serialFor(payload)))
-        assertEquals(LicenseValidationResult.Reason.INVALID_PAYLOAD, invalid.reason)
-    }
-
-    @Test
-    fun activationPersistsOnlyAfterValidValidation() {
+    fun verifierRequiresOnlyPublicMaterialAndPersistsOnlyValidResult() {
         val store = FakeActivationStore()
         val service = LicenseActivationService(verifier, store)
         assertFalse(service.isActivated())
-
         service.activate("bad")
         assertFalse(service.isActivated())
-
-        service.activate(serialFor(payload))
+        service.activate(validSerial)
         assertTrue(service.isActivated())
-        assertEquals(payload, store.payload)
+        assertEquals(LicensePayload(1, "MASJID", "AB12CD34"), store.payload)
     }
 
-    private fun serialFor(value: LicensePayload): String =
-        "${value.productCode}-${value.serialId}-${OfflineLicenseVerifier.signatureFor(value, config.verifierSalt)}"
+    @Test
+    fun invalidPublicVerifierMaterialFailsClosed() {
+        val invalidVerifier = OfflineLicenseVerifier(LicenseVerifierConfig("MASJID", "not-a-key"))
+        val invalid = assertIs<LicenseValidationResult.Invalid>(invalidVerifier.validate(validSerial))
+        assertEquals(LicenseValidationResult.Reason.INVALID_VERIFIER, invalid.reason)
+    }
 
     private class FakeActivationStore : ActivationStore {
         var payload: LicensePayload? = null
