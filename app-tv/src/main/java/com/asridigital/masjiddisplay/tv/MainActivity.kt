@@ -6,19 +6,19 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.room.Room
+import com.asridigital.masjiddisplay.database.ConfigRepository
+import com.asridigital.masjiddisplay.database.MasjidDisplayDatabase
 import com.asridigital.masjiddisplay.designsystem.MasjidDisplayColors
-import com.asridigital.masjiddisplay.domain.display.DisplayRuntimeConfig
-import com.asridigital.masjiddisplay.domain.prayer.PrayerCalculationConfig
-import com.asridigital.masjiddisplay.domain.prayer.PrayerCalculationMethod
-import kotlinx.coroutines.delay
-import java.time.ZoneId
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,47 +27,63 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Runtime vertical slice. The bootstrap config is temporary until Phase 5 Room persistence replaces
- * it; prayer calculation/state resolution already runs locally and requires no Admin phone/network.
- */
+/** No bootstrap mosque fixture: Room is the TV operational source of truth. */
 @Composable
 private fun TvRuntimeRoot() {
-    val runtime = remember {
-        TvRuntime(
-            config = TvRuntimeConfig(
-                mosqueName = "MASJID NURUL HIKMAH",
-                locationLabel = "Sleman, Daerah Istimewa Yogyakarta",
-                calculation = PrayerCalculationConfig(
-                    latitude = -7.7956,
-                    longitude = 110.3695,
-                    zoneId = ZoneId.of("Asia/Jakarta"),
-                    method = PrayerCalculationMethod.KEMENAG_INDONESIA,
-                ),
-                display = DisplayRuntimeConfig(),
-                informationMessage = "Selamat datang. Jaga ketenangan dan kebersihan masjid.",
-            ),
-        )
+    val context = LocalContext.current.applicationContext
+    val database = remember(context) {
+        Room.databaseBuilder(
+            context,
+            MasjidDisplayDatabase::class.java,
+            "masjid-display.db",
+        ).build()
     }
+    val controller = remember(database) {
+        TvAppController(ConfigRepository(database.mosqueConfigDao()))
+    }
+    val state by controller.state.collectAsState(initial = TvAppState.Unconfigured)
 
-    var snapshot by remember { mutableStateOf(runtime.snapshot()) }
-    LaunchedEffect(runtime) {
-        while (true) {
-            val millisToNextSecond = 1_000L - (System.currentTimeMillis() % 1_000L)
-            delay(millisToNextSecond)
-            snapshot = runtime.snapshot()
+    when (val current = state) {
+        TvAppState.Unconfigured -> UnconfiguredScreen()
+        is TvAppState.ConfigurationError -> ConfigurationErrorScreen(current.reason)
+        is TvAppState.Running -> TvDisplayScreen(
+            state = current.snapshot.state,
+            normalContent = current.snapshot.normalContent,
+            normalLayoutMode = current.snapshot.layoutMode,
+        ) { _ ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MasjidDisplayColors.SurfaceMuted),
+            )
         }
     }
+}
 
-    TvDisplayScreen(
-        state = snapshot.state,
-        normalContent = snapshot.normalContent,
-        normalLayoutMode = snapshot.layoutMode,
-    ) { _ ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MasjidDisplayColors.SurfaceMuted),
+@Composable
+private fun UnconfiguredScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize().background(MasjidDisplayColors.Background),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "MASJID DISPLAY\nBelum dikonfigurasi\nHubungkan aplikasi Admin untuk memulai",
+            color = MasjidDisplayColors.TextPrimary,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun ConfigurationErrorScreen(reason: String) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(MasjidDisplayColors.Background),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "Konfigurasi display perlu diperiksa\n$reason",
+            color = MasjidDisplayColors.Error,
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }
