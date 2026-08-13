@@ -1,0 +1,41 @@
+name: Android CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      # Bootstrap the canonical wrapper until its binary JAR is committed from a local Gradle run.
+      # AGP 8.7.x requires Gradle 8.9+, and the project pins AGP 8.7.3.
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.9 --distribution-type bin
+
+      - name: Unit tests
+        run: ./gradlew test --no-daemon
+
+      - name: Assemble TV debug APK
+        run: ./gradlew :app-tv:assembleDebug --no-daemon
