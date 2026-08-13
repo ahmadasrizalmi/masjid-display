@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -25,10 +25,7 @@ import com.asridigital.masjiddisplay.designsystem.TvTypography
 
 /**
  * One fixed/equal prayer row for the SIDEBAR_MEDIA family.
- *
- * The parent owns equal row distribution. This component guarantees the SSOT minimum baseline,
- * stable active-state geometry, left-aligned label/context, right-aligned tabular prayer time,
- * and optional countdown only for the relevant row.
+ * Stable geometry is part of the SSOT contract: active state never changes row height.
  */
 @Composable
 fun PrayerSidebarRow(
@@ -38,12 +35,16 @@ fun PrayerSidebarRow(
     isHighlighted: Boolean = false,
     countdown: String? = null,
 ) {
+    require(countdown == null || isHighlighted) {
+        "PrayerSidebarRow countdown may only be shown on the highlighted row"
+    }
+
     val background = if (isHighlighted) MasjidDisplayColors.SurfaceMuted else MasjidDisplayColors.Surface
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = TvDimensions.PrayerSidebarRowMinHeight)
+            .height(TvDimensions.PrayerSidebarRowHeight)
             .background(background),
     ) {
         if (isHighlighted) {
@@ -75,7 +76,7 @@ fun PrayerSidebarRow(
                 if (countdown != null) {
                     Text(
                         text = countdown,
-                        color = if (isHighlighted) MasjidDisplayColors.Accent else MasjidDisplayColors.TextSecondary,
+                        color = MasjidDisplayColors.Accent,
                         fontSize = TvTypography.PrayerSidebarCountdown,
                         fontWeight = FontWeight.Medium,
                         style = TextStyle(fontFeatureSettings = "tnum"),
@@ -100,19 +101,19 @@ fun PrayerSidebarRow(
     }
 }
 
-@Preview(widthDp = 430, heightDp = 266, showBackground = true)
+@Preview(widthDp = 430, heightDp = 133, showBackground = true)
 @Composable
-private fun PrayerSidebarRowStatesPreview() {
-    Column {
-        PrayerSidebarRow(
-            prayerName = "SUBUH",
-            prayerTime = "04:32",
-        )
-        PrayerSidebarRow(
-            prayerName = "DZUHUR",
-            prayerTime = "11:46",
-            isHighlighted = true,
-            countdown = "dalam 01:18",
-        )
-    }
+private fun PrayerSidebarRowNormalPreview() {
+    PrayerSidebarRow(prayerName = "SUBUH", prayerTime = "04:32")
+}
+
+@Preview(widthDp = 430, heightDp = 133, showBackground = true)
+@Composable
+private fun PrayerSidebarRowHighlightedPreview() {
+    PrayerSidebarRow(
+        prayerName = "DZUHUR",
+        prayerTime = "11:46",
+        isHighlighted = true,
+        countdown = "dalam 01:18",
+    )
 }
