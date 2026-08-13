@@ -16,6 +16,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "MasjidDisplay"
 include(":app-tv")
+include(":app-admin")
 include(":core:domain")
 include(":core:prayer")
 include(":core:database")
