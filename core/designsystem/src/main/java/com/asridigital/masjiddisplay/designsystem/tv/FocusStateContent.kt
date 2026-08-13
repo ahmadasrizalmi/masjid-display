@@ -26,9 +26,7 @@ import com.asridigital.masjiddisplay.designsystem.TvTypography
 
 /**
  * Shared presentation grammar for APPROACHING, ADHAN, IQAMAH, PRAYER, FRIDAY and NOTICE.
- *
- * The caller owns state priority and wording. This component intentionally contains no timer,
- * prayer calculation, carousel, ticker, QRIS, media, database or networking behavior.
+ * Caller owns state priority and wording. No timer/domain/network/media behavior lives here.
  */
 @Composable
 fun FocusStateContent(
@@ -36,8 +34,8 @@ fun FocusStateContent(
     modifier: Modifier = Modifier,
     stateLabel: String? = null,
     stateIcon: String? = null,
-    contextTime: String? = null,
     heroValue: String? = null,
+    contextTime: String? = null,
     secondaryMessage: String? = null,
 ) {
     Box(
@@ -64,7 +62,7 @@ fun FocusStateContent(
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                 )
-                Spacer(modifier = Modifier.height(TvDimensions.FocusSectionSpacing))
+                FocusSpacer()
             }
 
             if (stateLabel != null) {
@@ -77,36 +75,7 @@ fun FocusStateContent(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.height(TvDimensions.FocusSectionSpacing))
-            }
-
-            if (contextTime != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .width(TvDimensions.FocusAccentLineWidth)
-                            .height(TvDimensions.FocusAccentLineHeight)
-                            .background(MasjidDisplayColors.TvFocusAccent),
-                    )
-                    Spacer(modifier = Modifier.width(TvDimensions.FocusSectionSpacing))
-                    Text(
-                        text = contextTime,
-                        color = MasjidDisplayColors.TvFocusSecondary,
-                        fontSize = TvTypography.FocusContextTime,
-                        fontWeight = FontWeight.Medium,
-                        style = TextStyle(fontFeatureSettings = "tnum"),
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                    )
-                    Spacer(modifier = Modifier.width(TvDimensions.FocusSectionSpacing))
-                    Box(
-                        Modifier
-                            .width(TvDimensions.FocusAccentLineWidth)
-                            .height(TvDimensions.FocusAccentLineHeight)
-                            .background(MasjidDisplayColors.TvFocusAccent),
-                    )
-                }
-                Spacer(modifier = Modifier.height(TvDimensions.FocusSectionSpacing))
+                FocusSpacer()
             }
 
             Text(
@@ -120,7 +89,7 @@ fun FocusStateContent(
             )
 
             if (heroValue != null) {
-                Spacer(modifier = Modifier.height(TvDimensions.FocusSectionSpacing))
+                FocusSpacer()
                 Text(
                     text = heroValue,
                     color = MasjidDisplayColors.TvFocusText,
@@ -132,8 +101,27 @@ fun FocusStateContent(
                 )
             }
 
+            if (contextTime != null) {
+                FocusSpacer()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FocusAccentLine()
+                    Spacer(modifier = Modifier.width(TvDimensions.FocusSectionSpacing))
+                    Text(
+                        text = contextTime,
+                        color = MasjidDisplayColors.TvFocusSecondary,
+                        fontSize = TvTypography.FocusContextTime,
+                        fontWeight = FontWeight.Medium,
+                        style = TextStyle(fontFeatureSettings = "tnum"),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                    )
+                    Spacer(modifier = Modifier.width(TvDimensions.FocusSectionSpacing))
+                    FocusAccentLine()
+                }
+            }
+
             if (secondaryMessage != null) {
-                Spacer(modifier = Modifier.height(TvDimensions.FocusSectionSpacing))
+                FocusSpacer()
                 Text(
                     text = secondaryMessage,
                     color = MasjidDisplayColors.TvFocusSecondary,
@@ -148,6 +136,17 @@ fun FocusStateContent(
     }
 }
 
+@Composable
+private fun FocusSpacer() = Spacer(modifier = Modifier.height(TvDimensions.FocusSectionSpacing))
+
+@Composable
+private fun FocusAccentLine() = Box(
+    Modifier
+        .width(TvDimensions.FocusAccentLineWidth)
+        .height(TvDimensions.FocusAccentLineHeight)
+        .background(MasjidDisplayColors.TvFocusAccent),
+)
+
 @Preview(widthDp = 1920, heightDp = 1080, showBackground = true)
 @Composable
 private fun ApproachingFocusPreview() {
@@ -157,6 +156,17 @@ private fun ApproachingFocusPreview() {
         heroValue = "09:54",
         contextTime = "Adzan · 17:42",
         secondaryMessage = "Bersiap untuk menunaikan sholat berjamaah",
+    )
+}
+
+@Preview(widthDp = 1920, heightDp = 1080, showBackground = true)
+@Composable
+private fun AdhanFocusPreview() {
+    FocusStateContent(
+        stateIcon = "◇",
+        primaryLabel = "MAGHRIB",
+        heroValue = "17:42",
+        secondaryMessage = "WAKTU ADZAN",
     )
 }
 
@@ -178,5 +188,25 @@ private fun PrayerFocusPreview() {
         stateIcon = "◇",
         primaryLabel = "SHOLAT MAGHRIB",
         secondaryMessage = "Luruskan dan rapatkan shaf",
+    )
+}
+
+@Preview(widthDp = 1920, heightDp = 1080, showBackground = true)
+@Composable
+private fun FridayFocusPreview() {
+    FocusStateContent(
+        stateIcon = "◇",
+        primaryLabel = "SHOLAT JUMAT",
+        secondaryMessage = "Dengarkan khutbah dengan tenang",
+    )
+}
+
+@Preview(widthDp = 1920, heightDp = 1080, showBackground = true)
+@Composable
+private fun NoticeFocusPreview() {
+    FocusStateContent(
+        stateIcon = "◇",
+        primaryLabel = "SENYAPKAN PERANGKAT",
+        secondaryMessage = "Mohon aktifkan mode senyap sebelum sholat dimulai",
     )
 }
