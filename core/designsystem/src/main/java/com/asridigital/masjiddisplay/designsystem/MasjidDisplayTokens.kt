@@ -25,10 +25,12 @@ object TvDimensions {
     val HeaderVerticalPadding = 24.dp
 
     // HORIZONTAL_MEDIA prayer bar is 190px/dp high at the 1080p baseline.
+    val PrayerBarHeight = 190.dp
     val PrayerCellWidth = 320.dp
-    val PrayerCellHeight = 190.dp
+    val PrayerCellHeight = PrayerBarHeight
     val PrayerCellHorizontalPadding = 24.dp
     val PrayerCellVerticalPadding = 20.dp
+    val PrayerCellDividerWidth = 1.dp
     val ActiveIndicatorHeight = 6.dp
 }
 
