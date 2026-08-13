@@ -1,10 +1,12 @@
 package com.asridigital.masjiddisplay.designsystem.tv
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -56,11 +58,11 @@ fun PrayerBar(
             )
 
             if (index != prayers.lastIndex) {
-                HorizontalDivider(
+                Box(
                     modifier = Modifier
-                        .height(TvDimensions.PrayerBarHeight)
-                        .weight(0.002f),
-                    color = MasjidDisplayColors.Divider,
+                        .fillMaxHeight()
+                        .width(TvDimensions.PrayerCellDividerWidth)
+                        .background(MasjidDisplayColors.Divider),
                 )
             }
         }
