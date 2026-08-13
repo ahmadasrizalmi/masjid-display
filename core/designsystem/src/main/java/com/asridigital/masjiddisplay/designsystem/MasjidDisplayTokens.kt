@@ -38,7 +38,6 @@ object TvDimensions {
     val PrayerCellDividerWidth = 1.dp
     val ActiveIndicatorHeight = 6.dp
 
-    // 180 header + 6*133 prayer rows + 1px separators + 100 info bar fits 1080 baseline.
     val PrayerSidebarWidth = 430.dp
     val PrayerSidebarHeaderHeight = 180.dp
     val PrayerSidebarInfoBarHeight = 100.dp
@@ -46,6 +45,9 @@ object TvDimensions {
     val PrayerSidebarRowHorizontalPadding = 28.dp
     val PrayerSidebarActiveIndicatorWidth = 6.dp
     val PrayerSidebarDividerHeight = 1.dp
+
+    val InformationBarHeight = 100.dp
+    val InformationBarHorizontalPadding = 64.dp
 
     val FocusHorizontalSafeInset = 96.dp
     val FocusVerticalSafeInset = 54.dp
@@ -67,6 +69,7 @@ object TvTypography {
     val PrayerSidebarLabel = 30.sp
     val PrayerSidebarTime = 40.sp
     val PrayerSidebarCountdown = 22.sp
+    val InformationBar = 30.sp
 
     val FocusStateLabel = 30.sp
     val FocusPrimaryLabel = 72.sp
