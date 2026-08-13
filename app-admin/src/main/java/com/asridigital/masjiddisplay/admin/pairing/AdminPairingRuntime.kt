@@ -44,7 +44,11 @@ class AdminPairingRuntime(private val transport: AdminPairingTransportClient) {
             return
         }
         state = when (response) {
-            is CompletePairingResponse.Success -> AdminRuntimeState.Paired(device, response.credentialId)
+            is CompletePairingResponse.Success -> if (response.credentialId.isBlank()) {
+                AdminRuntimeState.Error("Credential pairing tidak valid")
+            } else {
+                AdminRuntimeState.Paired(device, response.credentialId)
+            }
             is CompletePairingResponse.Rejected -> AdminRuntimeState.Error("Pairing ditolak: ${response.code.name}")
         }
     }
