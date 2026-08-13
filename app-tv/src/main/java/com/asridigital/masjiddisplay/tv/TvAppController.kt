@@ -22,7 +22,7 @@ class TvAppController private constructor(
     constructor(repository: ConfigRepository, clock: Clock = Clock.systemUTC()) :
         this(repository.config, clock)
 
-    internal constructor(configFlow: Flow<PersistedTvConfig?>, clock: Clock = Clock.systemUTC(), testOnly: Unit = Unit) :
+    internal constructor(configFlow: Flow<PersistedTvConfig?>, clock: Clock, testOnly: Unit) :
         this(configFlow, clock)
 
     val state: Flow<TvAppState> = configFlow.flatMapLatest { persisted ->
