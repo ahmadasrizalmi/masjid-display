@@ -32,6 +32,16 @@ object TvDimensions {
     val PrayerCellVerticalPadding = 20.dp
     val PrayerCellDividerWidth = 1.dp
     val ActiveIndicatorHeight = 6.dp
+
+    // SIDEBAR_MEDIA baseline: 430px sidebar, 180px header, 100px info bar.
+    // Remaining 800px is shared by six equal rows; the parent layout owns exact distribution.
+    val PrayerSidebarWidth = 430.dp
+    val PrayerSidebarHeaderHeight = 180.dp
+    val PrayerSidebarInfoBarHeight = 100.dp
+    val PrayerSidebarRowMinHeight = 133.dp
+    val PrayerSidebarRowHorizontalPadding = 28.dp
+    val PrayerSidebarActiveIndicatorWidth = 6.dp
+    val PrayerSidebarDividerHeight = 1.dp
 }
 
 object TvTypography {
@@ -43,4 +53,7 @@ object TvTypography {
     val PrayerLabel = 34.sp
     val PrayerTime = 48.sp
     val PrayerCountdown = 26.sp
+    val PrayerSidebarLabel = 30.sp
+    val PrayerSidebarTime = 40.sp
+    val PrayerSidebarCountdown = 22.sp
 }
