@@ -5,13 +5,12 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.asridigital.masjiddisplay.domain.prayer.PrayerName
-import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFails
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -37,7 +36,12 @@ class ConfigRepositoryPersistenceTest {
         repository.save(valid, settings)
 
         val invalid = valid.copy(name = "")
-        assertFails { repository.save(invalid, settings) }
+        try {
+            repository.save(invalid, settings)
+            fail("Invalid config must be rejected before persistence")
+        } catch (_: IllegalArgumentException) {
+            // Expected: validation happens before Room transaction.
+        }
 
         val persisted = repository.current()
         assertNotNull(persisted)
