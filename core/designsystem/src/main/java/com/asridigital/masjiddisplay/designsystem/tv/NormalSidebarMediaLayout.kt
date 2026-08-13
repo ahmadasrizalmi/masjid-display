@@ -33,6 +33,9 @@ fun NormalSidebarMediaLayout(
 ) {
     require(prayers.size == 6) { "NormalSidebarMediaLayout requires exactly 6 prayer items" }
     require(prayers.count { it.isHighlighted } <= 1) { "Only one sidebar prayer may be highlighted" }
+    require(prayers.none { it.countdown != null && !it.isHighlighted }) {
+        "Sidebar countdown may only be shown on the highlighted prayer"
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         SidebarHeader(
@@ -49,6 +52,8 @@ fun NormalSidebarMediaLayout(
                     .background(MasjidDisplayColors.Surface),
             ) {
                 prayers.forEachIndexed { index, prayer ->
+                    // Weight distributes the available 800dp evenly after 5 fixed 1dp dividers.
+                    // PrayerSidebarRow fills that allocation while preserving stable active geometry.
                     PrayerSidebarRow(
                         prayerName = prayer.name,
                         prayerTime = prayer.time,
