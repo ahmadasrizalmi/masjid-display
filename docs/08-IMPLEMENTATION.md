@@ -2,171 +2,188 @@
 
 ## Rule of execution
 
-Jangan generate seluruh aplikasi dalam satu task. Implementasi per vertical slice, runnable dan testable. Tidak boleh menambahkan backend/cloud/web stack.
+Implementasi **component-first dan vertical-slice**, runnable/testable. Jangan generate seluruh aplikasi sekaligus. Untuk UI wajib mengikuti `09-UI-DESIGN-SYSTEM.md` sehingga model tanpa vision dapat membangun hasil yang konsisten.
 
 ## Phase 0 — Android Foundation
 
-- Gradle Kotlin DSL multi-module project
-- `app-tv`
-- `app-admin`
-- `core:domain`
-- `core:prayer`
-- `core:database`
-- `core:protocol`
-- `core:network-local`
-- `core:media`
-- `core:designsystem`
+- Gradle Kotlin DSL multi-module
+- `app-tv`, `app-admin`
+- `core:domain`, `core:prayer`, `core:database`, `core:protocol`, `core:network-local`, `core:media`, `core:designsystem`, `core:license`
 - Kotlin/Compose baseline
 - lint/test/build CI
 
-**Done:** kedua APK debug dapat dibuild; unit test berjalan.
+**Done:** kedua APK debug build; unit test baseline berjalan.
 
-## Phase 1 — Prayer Domain
+## Phase 1 — Design System Components
+
+Implement **tanpa business logic**:
+
+### Shared tokens
+- color tokens
+- typography
+- spacing
+- radius
+- icon sizing
+
+### TV primitives
+1. `TvHeader`
+2. `PrayerCell`
+3. `PrayerBar`
+4. `PrayerSidebarRow`
+5. `MediaSurface`
+6. `InformationBar`
+7. `FocusStateContent`
+
+### Admin primitives
+1. `AdminTopBar`
+2. `SetupStepper`
+3. `SettingsCard`
+4. `PrayerSettingCard`
+5. `DeviceStatusCard`
+6. `PrimaryButton`
+7. `MediaGrid`
+8. `TransferProgress`
+
+**Done:** Compose previews/sample screens menunjukkan dimensions/hierarchy sesuai doc 09; tidak ada network/database/domain dependency.
+
+## Phase 2 — Prayer Domain
 
 - canonical Kotlin models
-- prayer calculation lokal
-- correction offsets
+- local prayer calculation
+- offsets
 - timezone
 - daily schedule
-- iqamah target calculation
-- unit tests
-
-**Done:** fixture location/date menghasilkan schedule deterministic tanpa network.
-
-## Phase 2 — Display State Engine
-
-- pure Kotlin state resolver
-- approaching threshold
-- adhan duration
 - iqamah target
-- prayer duration
-- Friday override
+- tests
+
+**Done:** fixture deterministic tanpa network.
+
+## Phase 3 — Display State Engine
+
+- pure Kotlin resolver
+- approaching
+- adhan
+- iqamah
+- prayer
+- Friday
+- notice priority
 - boundary tests
 
 **Done:** transition diuji sebelum/saat/setelah boundary.
 
-## Phase 3 — Android TV Focus UI
+## Phase 4 — TV Screens
 
-- fullscreen Compose TV
-- Normal
-- Approaching
-- Adhan
-- Iqamah
-- Prayer
-- Friday
-- Information
-- dev-only clock/state preview
+Urutan implementasi:
+1. `NORMAL_HORIZONTAL_MEDIA`
+2. APPROACHING
+3. ADHAN
+4. IQAMAH
+5. PRAYER
+6. FRIDAY
+7. INFORMATION/NOTICE
+8. `NORMAL_SIDEBAR_MEDIA`
+9. dev-only state/clock switcher
 
-**Done:** seluruh state dapat dipreview pada emulator/perangkat tanpa Admin App.
+**Done:** semua state previewable pada 1280×720, 1920×1080, 3840×2160; tidak ada layout jump pada prayer highlight.
 
-## Phase 4 — TV Room Persistence
+## Phase 5 — TV Room Persistence
 
-- Room entities/DAO
-- migrations
+- Room entities/DAO/migrations
 - config repository
 - media metadata
 - boot configured/unconfigured
-- runtime observe config
+- runtime Flow observation
 
-**Done:** restart app/device mempertahankan konfigurasi dan display dapat berjalan tanpa network.
+**Done:** restart mempertahankan config; display berjalan tanpa network.
 
-## Phase 5 — Local Discovery & Secure Pairing
+## Phase 6 — Offline Licensing
+
+- `core:license` offline serial validator
+- activation persistence
+- Admin activation screen
+- invalid/valid tests
+- no network permission/dependency required by validator
+
+**Done:** serial valid dapat mengaktifkan onboarding dalam airplane/no-network condition.
+
+## Phase 7 — Local Discovery & Pairing
 
 - TV NSD advertise
 - Admin NSD discovery
-- pairing QR
-- one-time secret
-- trusted device credential
-- protocol version negotiation
-- reconnect setelah IP DHCP berubah
+- QR pairing
+- one-time pairing secret
+- trusted credential
+- protocol negotiation
+- DHCP/IP change reconnect
 
-**Done:** HP dapat pair dan reconnect ke TV tanpa mengetik IP.
+**Done:** pair/reconnect tanpa input IP.
 
-## Phase 6 — Admin APK
+## Phase 8 — Admin Screens
 
-- paired device home
-- mosque/location
-- prayer correction
-- iqamah
-- Friday
-- announcements
-- display appearance
-- status
-- preview
+Urutan:
+1. Activation
+2. Pair TV
+3. Mosque setup
+4. Setup review
+5. Home
+6. Prayer settings + edit bottom sheet
+7. Adhan/Iqamah
+8. Friday
+9. Announcements
+10. Display appearance
+11. Device status
 
-**Done:** perubahan dari Admin dikirim via LAN, divalidasi TV, tersimpan Room, dan langsung memengaruhi runtime yang relevan.
+**Done:** config dikirim LAN, divalidasi TV, persist Room, runtime bereaksi.
 
-## Phase 7 — Local Media Transfer
+## Phase 9 — Local Media Transfer
 
-- Android Photo Picker
+- Photo Picker
+- media grid
 - multi-select
 - upload session
-- streaming LAN
-- temporary file
-- checksum/validation
+- stream LAN
+- temp file/checksum
 - atomic save
-- progress
-- retry per-file
-- delete media
-- storage-full handling
+- progress/retry
+- delete/storage-full
 
-**Done:** beberapa foto dapat dikirim HP → TV tanpa internet dan kegagalan satu file tidak merusak file lain.
+**Done:** multi-photo transfer tanpa internet; individual retry.
 
-## Phase 8 — Hardening
+## Phase 10 — Hardening
 
-- pairing/security tests
-- database migration tests
-- UI tests
-- transfer interruption tests
-- large image/memory tests
+- security/pairing tests
+- DB migration tests
+- Compose UI tests
+- transfer interruption
+- image memory pressure
 - process death/restart
-- TV reboot/autostart behavior
+- TV reboot/autostart
 - accessibility/contrast
 - performance soak
 
-## Target source boundaries
+## Component task protocol
 
-```text
-app-tv/src/main/...
-app-admin/src/main/...
-core/domain/src/main/...
-core/prayer/src/main/...
-core/database/src/main/...
-core/protocol/src/main/...
-core/network-local/src/main/...
-core/media/src/main/...
-core/designsystem/src/main/...
-```
+Satu coding task idealnya hanya satu komponen atau satu behavior. Contoh pertama:
 
-## AI generation protocol
+> Implement `core:designsystem` tokens and TV `TvHeader` only. Read docs/00-SSOT-INDEX.md and docs/09-UI-DESIGN-SYSTEM.md. Add Compose previews at 1080p-equivalent constraints. Do not implement prayer calculation, database, network, license, or full screen.
 
-Setiap task harus menyebut:
-
-- phase
-- file/module scope
-- dokumen SSOT yang wajib dibaca
-- acceptance criteria
-- test yang wajib dibuat/diupdate
-- hal yang dilarang diubah
-
-Contoh:
-
-> Implement Phase 2 state resolver only in core:domain. Read docs/00-SSOT-INDEX.md, docs/03-DOMAIN-DATA.md, docs/04-STATE-MACHINE.md. Pure Kotlin only. No Android UI, network, database, backend, or cloud dependencies. Add boundary unit tests.
+Task berikutnya baru `PrayerCell`, lalu `PrayerBar`, dst.
 
 ## Definition of Done
 
 Task belum selesai jika:
-
+- dimensions/hierarchy menyimpang dari doc 09 tanpa SSOT update,
 - business rule baru tanpa test,
 - build/test gagal,
-- logic domain ditempel di Composable,
-- TV membutuhkan HP agar state prayer terus berjalan,
-- IP address di-hardcode,
-- media/config dikirim melalui internet,
-- dependency backend/cloud/web ditambahkan,
-- behavior bertentangan dengan SSOT,
+- domain logic ditempel di Composable,
+- TV membutuhkan HP agar prayer runtime berjalan,
+- IP di-hardcode,
+- media/config dikirim via internet,
+- license validator melakukan network call,
+- backend/cloud dependency ditambahkan,
+- reference branding/assets disalin,
 - TODO menggantikan acceptance criteria utama.
 
 ## Change management
 
-Keputusan arsitektur harus diubah di SSOT terlebih dahulu, baru code/test. Jangan meninggalkan arsitektur lama sebagai fallback atau komentar alternatif karena dapat membingungkan code generator.
+Ubah SSOT → test expectation → code. Jangan meninggalkan arsitektur/desain lama sebagai fallback komentar yang dapat membingungkan generator.
