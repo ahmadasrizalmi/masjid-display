@@ -31,8 +31,10 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:domain"))
     implementation(project(":core:prayer"))
+    implementation(project(":core:database"))
     implementation("androidx.activity:activity-compose:1.10.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.room:room-runtime:2.6.1")
     testImplementation(kotlin("test"))
 }
