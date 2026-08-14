@@ -108,6 +108,21 @@ class TvPairingSessionManager(
         return PairingChallenge(id, secretText, LocalProtocol.CURRENT_VERSION, session.expiresAt)
     }
 
+    /** LAN-visible session information; the bootstrap secret never leaves the TV display channel. */
+    fun activeSessionMetadata(): OpenPairingResponse? {
+        val session = active ?: return null
+        if (!clock.instant().isBefore(session.expiresAt)) {
+            consumedSessionIds += session.id
+            active = null
+            return null
+        }
+        return OpenPairingResponse(
+            sessionId = session.id.value,
+            protocolVersion = LocalProtocol.CURRENT_VERSION,
+            expiresAt = session.expiresAt,
+        )
+    }
+
     fun close(sessionId: PairingSessionId) {
         if (active?.id == sessionId) {
             consumedSessionIds += sessionId

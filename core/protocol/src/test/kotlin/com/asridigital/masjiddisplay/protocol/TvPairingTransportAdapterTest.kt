@@ -8,19 +8,30 @@ import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class TvPairingTransportAdapterTest {
     private val start = Instant.parse("2026-08-13T13:00:00Z")
 
     @Test
-    fun openReturnsChallengeAndCompleteReturnsTrustedCredential() {
+    fun tvDisplayCreatesChallengeAndLanOpenExposesOnlyPublicMetadata() {
         val adapter = adapter(tokens = listOf("session-1", "secret-1", "credential-1"))
-        val challenge = adapter.open()
 
-        assertEquals("session-1", challenge.sessionId)
-        assertEquals("secret-1", challenge.oneTimeSecret)
-        assertEquals(LocalProtocol.CURRENT_VERSION, challenge.protocolVersion)
-        assertEquals(start.plus(Duration.ofMinutes(5)), challenge.expiresAt)
+        assertNull(adapter.open())
+        val challenge = adapter.beginPairingForTvDisplay()
+        val public = adapter.open()
+
+        assertEquals("session-1", challenge.sessionId.value)
+        assertEquals("secret-1", challenge.secretForQrOrFallback)
+        assertEquals("session-1", public?.sessionId)
+        assertEquals(LocalProtocol.CURRENT_VERSION, public?.protocolVersion)
+        assertEquals(start.plus(Duration.ofMinutes(5)), public?.expiresAt)
+    }
+
+    @Test
+    fun correctTvCodeProducesTrustedCredential() {
+        val adapter = adapter(tokens = listOf("session-1", "secret-1", "credential-1"))
+        val challenge = adapter.beginPairingForTvDisplay()
 
         assertEquals(
             CompletePairingResponse.Success("credential-1", start),
@@ -29,22 +40,14 @@ class TvPairingTransportAdapterTest {
     }
 
     @Test
-    fun malformedRequestIsRejectedBeforeSessionManager() {
+    fun missingOrWrongTvCodeIsRejectedWithoutConsumingSession() {
         val adapter = adapter(tokens = listOf("session-1", "secret-1", "credential-1"))
-        val challenge = adapter.open()
+        val challenge = adapter.beginPairingForTvDisplay()
 
         assertEquals(
             CompletePairingResponse.Rejected(PairingErrorCode.MALFORMED_REQUEST),
-            adapter.complete(CompletePairingRequest("", challenge.oneTimeSecret, challenge.protocolVersion)),
+            adapter.complete(CompletePairingRequest(challenge.sessionId.value, "", challenge.protocolVersion)),
         )
-        assertIs<CompletePairingResponse.Success>(adapter.complete(request(challenge)))
-    }
-
-    @Test
-    fun wrongSecretMapsToSecretMismatchWithoutConsumingSession() {
-        val adapter = adapter(tokens = listOf("session-1", "secret-1", "credential-1"))
-        val challenge = adapter.open()
-
         assertEquals(
             CompletePairingResponse.Rejected(PairingErrorCode.SECRET_MISMATCH),
             adapter.complete(request(challenge, secret = "wrong")),
@@ -53,21 +56,9 @@ class TvPairingTransportAdapterTest {
     }
 
     @Test
-    fun unsupportedVersionMapsToProtocolMismatchWithoutConsumingSession() {
+    fun successfulPairingReplayIsRejected() {
         val adapter = adapter(tokens = listOf("session-1", "secret-1", "credential-1"))
-        val challenge = adapter.open()
-
-        assertEquals(
-            CompletePairingResponse.Rejected(PairingErrorCode.PROTOCOL_MISMATCH),
-            adapter.complete(request(challenge, version = LocalProtocol.CURRENT_VERSION + 1)),
-        )
-        assertIs<CompletePairingResponse.Success>(adapter.complete(request(challenge)))
-    }
-
-    @Test
-    fun successfulPairingReplayMapsToReplayRejected() {
-        val adapter = adapter(tokens = listOf("session-1", "secret-1", "credential-1"))
-        val challenge = adapter.open()
+        val challenge = adapter.beginPairingForTvDisplay()
         adapter.complete(request(challenge))
 
         assertEquals(
@@ -77,37 +68,24 @@ class TvPairingTransportAdapterTest {
     }
 
     @Test
-    fun expiredSessionMapsToSessionExpiredThenReplayRejected() {
+    fun expiredSessionIsNotVisibleAndCompleteIsRejected() {
         val clock = MutableClock(start)
         val adapter = adapter(clock = clock, tokens = listOf("session-1", "secret-1"))
-        val challenge = adapter.open()
+        val challenge = adapter.beginPairingForTvDisplay()
         clock.advance(Duration.ofMinutes(5))
 
-        assertEquals(
-            CompletePairingResponse.Rejected(PairingErrorCode.SESSION_EXPIRED),
-            adapter.complete(request(challenge)),
-        )
+        assertNull(adapter.open())
         assertEquals(
             CompletePairingResponse.Rejected(PairingErrorCode.REPLAY_REJECTED),
             adapter.complete(request(challenge)),
         )
     }
 
-    @Test
-    fun unknownSessionMapsToNoActiveSession() {
-        val adapter = adapter(tokens = emptyList())
-
-        assertEquals(
-            CompletePairingResponse.Rejected(PairingErrorCode.NO_ACTIVE_SESSION),
-            adapter.complete(CompletePairingRequest("unknown", "secret", LocalProtocol.CURRENT_VERSION)),
-        )
-    }
-
     private fun request(
-        challenge: OpenPairingResponse,
-        secret: String = challenge.oneTimeSecret,
+        challenge: PairingChallenge,
+        secret: String = challenge.secretForQrOrFallback,
         version: Int = challenge.protocolVersion,
-    ) = CompletePairingRequest(challenge.sessionId, secret, version)
+    ) = CompletePairingRequest(challenge.sessionId.value, secret, version)
 
     private fun adapter(
         clock: Clock = Clock.fixed(start, ZoneOffset.UTC),

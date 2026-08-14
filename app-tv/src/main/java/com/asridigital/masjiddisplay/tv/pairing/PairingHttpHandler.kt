@@ -13,7 +13,8 @@ class PairingHttpHandler(private val pairing: TvPairingTransportAdapter) {
     fun handle(request: PairingHttpRequest): PairingHttpResponse {
         if (request.method != "POST") return response(405, "")
         return when (request.path) {
-            PairingTransportPaths.OPEN -> response(200, PairingWireContract.encodeOpen(pairing.open()))
+            PairingTransportPaths.OPEN -> pairing.open()?.let { response(200, PairingWireContract.encodeOpen(it)) }
+                ?: response(404, "")
             PairingTransportPaths.COMPLETE -> {
                 val complete = PairingWireContract.decodeComplete(request.body)
                     ?: return response(400, PairingWireContract.encodeResult(CompletePairingResponse.Rejected(PairingErrorCode.MALFORMED_REQUEST)))

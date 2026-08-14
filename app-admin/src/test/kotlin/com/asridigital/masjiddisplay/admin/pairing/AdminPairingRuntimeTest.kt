@@ -5,6 +5,7 @@ import com.asridigital.masjiddisplay.protocol.CompletePairingResponse
 import com.asridigital.masjiddisplay.protocol.DiscoveredTvService
 import com.asridigital.masjiddisplay.protocol.LocalProtocol
 import com.asridigital.masjiddisplay.protocol.OpenPairingResponse
+import com.asridigital.masjiddisplay.protocol.PairingBootstrap
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,7 +31,7 @@ class AdminPairingRuntimeTest {
         val runtime = AdminPairingRuntime(transport)
         val device = device()
 
-        runtime.pair(device)
+        runtime.pair(device, PairingBootstrap("secret"))
 
         assertEquals(AdminRuntimeState.Paired(device, "trusted-credential"), runtime.state)
         assertEquals(1, transport.openCalls)
@@ -46,7 +47,7 @@ class AdminPairingRuntimeTest {
         val transport = FakeTransport()
         val runtime = AdminPairingRuntime(transport)
 
-        runtime.pair(device(version = LocalProtocol.CURRENT_VERSION + 1))
+        runtime.pair(device(version = LocalProtocol.CURRENT_VERSION + 1), PairingBootstrap("secret"))
 
         assertEquals(AdminRuntimeState.Error("Versi protokol TV tidak didukung"), runtime.state)
         assertEquals(0, transport.openCalls)
@@ -57,7 +58,7 @@ class AdminPairingRuntimeTest {
     fun openTransportFailureProducesExplicitError() {
         val runtime = AdminPairingRuntime(FakeTransport(openResult = Result.failure(IllegalStateException())))
 
-        runtime.pair(device())
+        runtime.pair(device(), PairingBootstrap("secret"))
 
         assertEquals(AdminRuntimeState.Error("TV tidak dapat membuka sesi pairing"), runtime.state)
     }
@@ -66,7 +67,7 @@ class AdminPairingRuntimeTest {
     fun completeTransportFailureProducesExplicitLocalConnectionError() {
         val runtime = AdminPairingRuntime(FakeTransport(completeResult = Result.failure(IllegalStateException())))
 
-        runtime.pair(device())
+        runtime.pair(device(), PairingBootstrap("secret"))
 
         assertEquals(AdminRuntimeState.Error("Koneksi pairing lokal gagal"), runtime.state)
     }
@@ -77,7 +78,7 @@ class AdminPairingRuntimeTest {
             FakeTransport(completeResult = Result.success(CompletePairingResponse.Rejected(com.asridigital.masjiddisplay.protocol.PairingErrorCode.SECRET_MISMATCH))),
         )
 
-        runtime.pair(device())
+        runtime.pair(device(), PairingBootstrap("secret"))
 
         assertEquals(AdminRuntimeState.Error("Pairing ditolak: SECRET_MISMATCH"), runtime.state)
     }
@@ -88,7 +89,7 @@ class AdminPairingRuntimeTest {
             FakeTransport(completeResult = Result.success(CompletePairingResponse.Success("", Instant.EPOCH))),
         )
 
-        runtime.pair(device())
+        runtime.pair(device(), PairingBootstrap("secret"))
 
         assertEquals(AdminRuntimeState.Error("Credential pairing tidak valid"), runtime.state)
     }
@@ -102,7 +103,7 @@ class AdminPairingRuntimeTest {
 
     private class FakeTransport(
         private val openResult: Result<OpenPairingResponse> = Result.success(
-            OpenPairingResponse("session", "secret", LocalProtocol.CURRENT_VERSION, Instant.EPOCH),
+            OpenPairingResponse("session", LocalProtocol.CURRENT_VERSION, Instant.EPOCH),
         ),
         private val completeResult: Result<CompletePairingResponse> = Result.success(
             CompletePairingResponse.Success("trusted-credential", Instant.EPOCH),

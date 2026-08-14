@@ -1,15 +1,11 @@
 package com.asridigital.masjiddisplay.protocol
 
 class TvPairingTransportAdapter(private val sessions: TvPairingSessionManager) {
-    fun open(): OpenPairingResponse {
-        val challenge = sessions.open()
-        return OpenPairingResponse(
-            sessionId = challenge.sessionId.value,
-            oneTimeSecret = challenge.secretForQrOrFallback,
-            protocolVersion = challenge.protocolVersion,
-            expiresAt = challenge.expiresAt,
-        )
-    }
+    /** Must be invoked by the TV pairing screen; only that screen may display the returned secret. */
+    fun beginPairingForTvDisplay(): PairingChallenge = sessions.open()
+
+    /** LAN endpoint may read public metadata for the session, but never its bootstrap secret. */
+    fun open(): OpenPairingResponse? = sessions.activeSessionMetadata()
 
     fun complete(request: CompletePairingRequest): CompletePairingResponse {
         if (request.sessionId.isBlank() || request.oneTimeSecret.isBlank()) {

@@ -4,6 +4,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import com.asridigital.masjiddisplay.protocol.LocalDiscoveryContract
 import com.asridigital.masjiddisplay.protocol.LocalProtocol
+import com.asridigital.masjiddisplay.tv.pairing.PairingLanAdvertiser
 
 private const val DEFAULT_SERVICE_NAME = "Masjid Display TV"
 
@@ -16,14 +17,14 @@ sealed interface NsdAdvertiseState {
 class TvNsdAdvertiser(
     private val nsdManager: NsdManager,
     private val serviceName: String = DEFAULT_SERVICE_NAME,
-) {
+) : PairingLanAdvertiser {
     private var listener: NsdManager.RegistrationListener? = null
 
     @Volatile
     var state: NsdAdvertiseState = NsdAdvertiseState.Idle
         private set
 
-    fun start(port: Int) {
+    override fun start(port: Int) {
         require(port in 1..65535)
         if (listener != null) return
         val info = NsdServiceInfo().apply {
@@ -51,7 +52,7 @@ class TvNsdAdvertiser(
         nsdManager.registerService(info, NsdManager.PROTOCOL_DNS_SD, registration)
     }
 
-    fun stop() {
+    override fun stop() {
         val current = listener ?: return
         listener = null
         nsdManager.unregisterService(current)
