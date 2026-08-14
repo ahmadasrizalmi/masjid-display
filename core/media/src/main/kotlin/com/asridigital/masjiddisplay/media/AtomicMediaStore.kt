@@ -10,6 +10,7 @@ import java.util.UUID
 
 private const val MAX_MEDIA_BYTES = 50L * 1024L * 1024L
 private val allowedMimeTypes = setOf("image/jpeg", "image/png", "image/webp")
+private val safeMediaId = Regex("[A-Za-z0-9_-]{1,64}")
 
 data class MediaUploadSpec(
     val mediaId: String,
@@ -19,7 +20,7 @@ data class MediaUploadSpec(
     val expectedSha256: String,
 ) {
     init {
-        require(mediaId.isNotBlank())
+        require(mediaId.matches(safeMediaId)) { "Media id contains unsafe characters" }
         require(originalFilename.isNotBlank())
         require(mimeType in allowedMimeTypes) { "Unsupported media type" }
         require(expectedBytes in 1..MAX_MEDIA_BYTES) { "Media size is outside allowed bounds" }
@@ -64,6 +65,7 @@ class AtomicMediaStore(private val root: Path) : Closeable {
         return try {
             val digest = MessageDigest.getInstance("SHA-256")
             var written = 0L
+            var overflow = false
             Files.newOutputStream(temp).use { output ->
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                 while (true) {
@@ -72,14 +74,15 @@ class AtomicMediaStore(private val root: Path) : Closeable {
                     if (count == 0) continue
                     written += count
                     if (written > spec.expectedBytes || written > MAX_MEDIA_BYTES) {
-                        return rejectAndDelete(temp, MediaStoreError.SIZE_MISMATCH)
+                        overflow = true
+                        break
                     }
                     digest.update(buffer, 0, count)
                     output.write(buffer, 0, count)
                 }
             }
 
-            if (written != spec.expectedBytes) {
+            if (overflow || written != spec.expectedBytes) {
                 return rejectAndDelete(temp, MediaStoreError.SIZE_MISMATCH)
             }
 
@@ -105,7 +108,7 @@ class AtomicMediaStore(private val root: Path) : Closeable {
     }
 
     fun delete(mediaId: String): Boolean {
-        require(mediaId.isNotBlank())
+        require(mediaId.matches(safeMediaId)) { "Media id contains unsafe characters" }
         val prefix = "$mediaId."
         Files.list(mediaDir).use { paths ->
             val match = paths.filter { it.fileName.toString().startsWith(prefix) }.findFirst()
