@@ -33,6 +33,7 @@ dependencies {
     implementation(project(":core:prayer"))
     implementation(project(":core:database"))
     implementation(project(":core:protocol"))
+    implementation(project(":core:media"))
     implementation("androidx.activity:activity-compose:1.10.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")

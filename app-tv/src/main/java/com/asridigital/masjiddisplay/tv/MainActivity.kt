@@ -22,12 +22,14 @@ import androidx.room.Room
 import com.asridigital.masjiddisplay.database.ConfigRepository
 import com.asridigital.masjiddisplay.database.MasjidDisplayDatabase
 import com.asridigital.masjiddisplay.designsystem.MasjidDisplayColors
+import com.asridigital.masjiddisplay.media.AtomicMediaStore
 import com.asridigital.masjiddisplay.protocol.PairingChallenge
 import com.asridigital.masjiddisplay.tv.pairing.TvPairingRuntimeOwner
 
 class MainActivity : ComponentActivity() {
     private lateinit var database: MasjidDisplayDatabase
     private lateinit var configRepository: ConfigRepository
+    private lateinit var mediaStore: AtomicMediaStore
     private lateinit var pairingRuntime: TvPairingRuntimeOwner
     private var pairingChallenge by mutableStateOf<PairingChallenge?>(null)
 
@@ -39,11 +41,14 @@ class MainActivity : ComponentActivity() {
             "masjid-display.db",
         ).build()
         configRepository = ConfigRepository(database.mosqueConfigDao())
+        mediaStore = AtomicMediaStore(filesDir.toPath())
 
         val trustedCredentials = getSharedPreferences(TRUSTED_CREDENTIALS_PREFS, Context.MODE_PRIVATE)
         pairingRuntime = TvPairingRuntimeOwner(
             nsdManager = getSystemService(NsdManager::class.java),
             configRepository = configRepository,
+            mediaStore = mediaStore,
+            mediaDao = database.mediaItemDao(),
             onCredentialIssued = { credentialId ->
                 trustedCredentials.edit().putBoolean(credentialId, true).apply()
             },
@@ -64,6 +69,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        mediaStore.close()
         database.close()
         super.onDestroy()
     }

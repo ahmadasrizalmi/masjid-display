@@ -3,6 +3,7 @@ package com.asridigital.masjiddisplay.tv.pairing
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.Closeable
+import java.io.InputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.StandardCharsets
@@ -10,11 +11,12 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
- * TV-local HTTP boundary. The operating system selects a free LAN port; callers advertise [port]
- * through NSD. This server exposes no cloud or global endpoints.
+ * TV-local HTTP boundary. Small control messages are buffered; registered media routes receive
+ * the socket body as a stream so photo bytes are never converted to String/base64.
  */
 class PairingLanServer(
     private val handler: PairingHttpHandler,
+    private val streamHandler: ((String, String, Long, InputStream) -> PairingHttpResponse?)? = null,
     private val serverSocketFactory: () -> ServerSocket = { ServerSocket(0) },
     private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
 ) : Closeable {
@@ -49,9 +51,26 @@ class PairingLanServer(
 
     private fun handleClient(socket: Socket) {
         socket.soTimeout = SOCKET_TIMEOUT_MILLIS
-        val request = socket.getInputStream().buffered().readRequest()
-        val response = request?.let(handler::handle)
-            ?: PairingHttpResponse(400, "text/plain; charset=utf-8", "")
+        val input = socket.getInputStream().buffered()
+        val head = input.readRequestHead()
+        val response = if (head == null) {
+            PairingHttpResponse(400, "text/plain; charset=utf-8", "")
+        } else {
+            val streamed = streamHandler?.invoke(head.method, head.path, head.contentLength.toLong(), input)
+            when {
+                streamed != null -> streamed
+                head.contentLength > MAX_CONTROL_BODY_BYTES -> PairingHttpResponse(413, "text/plain; charset=utf-8", "")
+                else -> {
+                    val body = input.readExact(head.contentLength)
+                    if (body == null) PairingHttpResponse(400, "text/plain; charset=utf-8", "")
+                    else handler.handle(PairingHttpRequest(head.method, head.path, body.toString(StandardCharsets.UTF_8)))
+                }
+            }
+        }
+        writeResponse(socket, response)
+    }
+
+    private fun writeResponse(socket: Socket, response: PairingHttpResponse) {
         BufferedOutputStream(socket.getOutputStream()).use { output ->
             val bytes = response.body.toByteArray(StandardCharsets.UTF_8)
             val reason = when (response.status) {
@@ -60,6 +79,9 @@ class PairingLanServer(
                 403 -> "Forbidden"
                 404 -> "Not Found"
                 405 -> "Method Not Allowed"
+                410 -> "Gone"
+                413 -> "Payload Too Large"
+                507 -> "Insufficient Storage"
                 else -> "Internal Server Error"
             }
             output.write("HTTP/1.1 ${response.status} $reason\r\n".toByteArray(StandardCharsets.US_ASCII))
@@ -78,7 +100,9 @@ class PairingLanServer(
         executor.shutdownNow()
     }
 
-    private fun BufferedInputStream.readRequest(): PairingHttpRequest? {
+    private data class RequestHead(val method: String, val path: String, val contentLength: Int)
+
+    private fun BufferedInputStream.readRequestHead(): RequestHead? {
         val requestLine = readAsciiLine() ?: return null
         val pieces = requestLine.split(' ')
         if (pieces.size != 3 || !pieces[2].startsWith("HTTP/")) return null
@@ -94,15 +118,19 @@ class PairingLanServer(
                 contentLength = line.substring(separator + 1).trim().toIntOrNull() ?: return null
             }
         }
-        if (contentLength !in 0..MAX_BODY_BYTES) return null
-        val body = ByteArray(contentLength)
+        if (contentLength !in 0..MAX_STREAM_BODY_BYTES) return null
+        return RequestHead(pieces[0], pieces[1], contentLength)
+    }
+
+    private fun BufferedInputStream.readExact(size: Int): ByteArray? {
+        val body = ByteArray(size)
         var offset = 0
         while (offset < body.size) {
             val read = read(body, offset, body.size - offset)
             if (read < 0) return null
             offset += read
         }
-        return PairingHttpRequest(pieces[0], pieces[1], body.toString(StandardCharsets.UTF_8))
+        return body
     }
 
     private fun BufferedInputStream.readAsciiLine(): String? {
@@ -123,6 +151,7 @@ class PairingLanServer(
         const val SOCKET_TIMEOUT_MILLIS = 5_000
         const val MAX_LINE_BYTES = 2_048
         const val MAX_HEADERS = 32
-        const val MAX_BODY_BYTES = 16_384
+        const val MAX_CONTROL_BODY_BYTES = 16_384
+        const val MAX_STREAM_BODY_BYTES = 50 * 1024 * 1024
     }
 }

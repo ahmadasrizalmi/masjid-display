@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.asridigital.masjiddisplay.admin.config.AdminHomeScreen
 import com.asridigital.masjiddisplay.admin.config.AdminOperationalDraft
 import com.asridigital.masjiddisplay.admin.config.AdminPhase8Screen
 import com.asridigital.masjiddisplay.admin.config.AnnouncementsScreen
@@ -43,6 +42,12 @@ import com.asridigital.masjiddisplay.admin.config.MosqueInformationScreen
 import com.asridigital.masjiddisplay.admin.config.PrayerSettingsScreen
 import com.asridigital.masjiddisplay.admin.config.SetupReviewScreen
 import com.asridigital.masjiddisplay.admin.discovery.AdminNsdDiscovery
+import com.asridigital.masjiddisplay.admin.media.AndroidLocalMediaSource
+import com.asridigital.masjiddisplay.admin.media.LanMediaTransferClient
+import com.asridigital.masjiddisplay.admin.media.MediaTransferCoordinator
+import com.asridigital.masjiddisplay.admin.media.MediaTransferItem
+import com.asridigital.masjiddisplay.admin.media.MediaTransferScreen
+import com.asridigital.masjiddisplay.admin.media.Phase9AdminHomeScreen
 import com.asridigital.masjiddisplay.admin.pairing.AdminPairingCoordinator
 import com.asridigital.masjiddisplay.admin.pairing.AdminPairingRuntime
 import com.asridigital.masjiddisplay.admin.pairing.AdminRuntimeState
@@ -50,6 +55,7 @@ import com.asridigital.masjiddisplay.admin.pairing.LanPairingTransportClient
 import com.asridigital.masjiddisplay.admin.setup.MosqueSetupDraft
 import com.asridigital.masjiddisplay.admin.setup.MosqueSetupScreen
 import com.asridigital.masjiddisplay.protocol.DiscoveredTvService
+import com.asridigital.masjiddisplay.protocol.MediaListItem
 import com.asridigital.masjiddisplay.protocol.ProtocolNegotiation
 import com.asridigital.masjiddisplay.protocol.TvConfigUpdateResponse
 import java.time.ZoneId
@@ -68,8 +74,10 @@ class MainActivity : ComponentActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val pairingExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val configClient = LanConfigTransportClient()
+    private val mediaClient = LanMediaTransferClient()
     private lateinit var coordinator: AdminPairingCoordinator
     private lateinit var mosqueId: String
+    private var mediaCoordinator: MediaTransferCoordinator? = null
 
     private var uiState by mutableStateOf<AdminRuntimeState>(AdminRuntimeState.Discovering)
     private var fallbackCode by mutableStateOf("")
@@ -79,6 +87,10 @@ class MainActivity : ComponentActivity() {
     private var workingDraft by mutableStateOf<AdminOperationalDraft?>(null)
     private var phase8Screen by mutableStateOf(AdminPhase8Screen.REVIEW)
     private var configSaveState by mutableStateOf<ConfigSaveState>(ConfigSaveState.Idle)
+    private var mediaMode by mutableStateOf(false)
+    private var mediaTransferItems by mutableStateOf<List<MediaTransferItem>>(emptyList())
+    private var mediaExistingItems by mutableStateOf<List<MediaListItem>>(emptyList())
+    private var mediaSelectionError by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -144,19 +156,54 @@ class MainActivity : ComponentActivity() {
                     },
                 )
 
-                else -> Phase8Runtime(
-                    paired = paired,
-                    committed = requireNotNull(operationalDraft),
-                )
+                else -> RuntimeScreens(paired, requireNotNull(operationalDraft))
             }
         }
     }
 
     @Composable
-    private fun Phase8Runtime(
-        paired: AdminRuntimeState.Paired,
-        committed: AdminOperationalDraft,
-    ) {
+    private fun RuntimeScreens(paired: AdminRuntimeState.Paired, committed: AdminOperationalDraft) {
+        if (mediaMode) {
+            val transfer = mediaCoordinator ?: MediaTransferCoordinator(
+                client = mediaClient,
+                device = paired.device,
+                credentialId = paired.credentialId,
+            ).also { mediaCoordinator = it }
+            MediaTransferScreen(
+                existingItems = mediaExistingItems,
+                transferItems = mediaTransferItems,
+                selectionError = mediaSelectionError,
+                onPicked = { uris ->
+                    mediaSelectionError = null
+                    pairingExecutor.execute {
+                        val sources = mutableListOf<AndroidLocalMediaSource>()
+                        var firstError: String? = null
+                        uris.forEach { uri ->
+                            runCatching { AndroidLocalMediaSource.from(contentResolver, uri) }
+                                .onSuccess(sources::add)
+                                .onFailure { if (firstError == null) firstError = it.message ?: "Media tidak dapat dibaca" }
+                        }
+                        transfer.enqueue(sources)
+                        transfer.uploadPending { snapshot -> mainHandler.post { mediaTransferItems = snapshot } }
+                        mainHandler.post {
+                            mediaTransferItems = transfer.items
+                            mediaSelectionError = firstError
+                        }
+                        refreshMediaList(paired)
+                    }
+                },
+                onRetry = { mediaId ->
+                    pairingExecutor.execute {
+                        transfer.retry(mediaId) { snapshot -> mainHandler.post { mediaTransferItems = snapshot } }
+                        refreshMediaList(paired)
+                    }
+                },
+                onDelete = { mediaId -> deleteMedia(paired, transfer, mediaId) },
+                onBack = { mediaMode = false },
+            )
+            return
+        }
+
         val editing = workingDraft ?: committed
         val goHome = {
             workingDraft = committed
@@ -183,7 +230,12 @@ class MainActivity : ComponentActivity() {
 
         when (phase8Screen) {
             AdminPhase8Screen.REVIEW,
-            AdminPhase8Screen.HOME -> AdminHomeScreen(committed, paired.device.serviceName, navigate)
+            AdminPhase8Screen.HOME -> Phase9AdminHomeScreen(
+                draft = committed,
+                deviceName = paired.device.serviceName,
+                onNavigate = navigate,
+                onMedia = { openMedia(paired) },
+            )
 
             AdminPhase8Screen.MOSQUE -> MosqueInformationScreen(
                 draft = editing,
@@ -192,56 +244,50 @@ class MainActivity : ComponentActivity() {
                 onSave = saveEditing,
                 onBack = goHome,
             )
-
-            AdminPhase8Screen.PRAYER -> PrayerSettingsScreen(
-                draft = editing,
-                saveState = configSaveState,
-                onDraftChanged = updateWorking,
-                onSave = saveEditing,
-                onBack = goHome,
-            )
-
-            AdminPhase8Screen.IQAMAH -> IqamahSettingsScreen(
-                draft = editing,
-                saveState = configSaveState,
-                onDraftChanged = updateWorking,
-                onSave = saveEditing,
-                onBack = goHome,
-            )
-
-            AdminPhase8Screen.FRIDAY -> FridaySettingsScreen(
-                draft = editing,
-                saveState = configSaveState,
-                onDraftChanged = updateWorking,
-                onSave = saveEditing,
-                onBack = goHome,
-            )
-
-            AdminPhase8Screen.ANNOUNCEMENTS -> AnnouncementsScreen(
-                draft = editing,
-                saveState = configSaveState,
-                onDraftChanged = updateWorking,
-                onSave = saveEditing,
-                onBack = goHome,
-            )
-
-            AdminPhase8Screen.APPEARANCE -> DisplayAppearanceScreen(
-                draft = editing,
-                saveState = configSaveState,
-                onDraftChanged = updateWorking,
-                onSave = saveEditing,
-                onBack = goHome,
-            )
-
+            AdminPhase8Screen.PRAYER -> PrayerSettingsScreen(editing, configSaveState, updateWorking, saveEditing, goHome)
+            AdminPhase8Screen.IQAMAH -> IqamahSettingsScreen(editing, configSaveState, updateWorking, saveEditing, goHome)
+            AdminPhase8Screen.FRIDAY -> FridaySettingsScreen(editing, configSaveState, updateWorking, saveEditing, goHome)
+            AdminPhase8Screen.ANNOUNCEMENTS -> AnnouncementsScreen(editing, configSaveState, updateWorking, saveEditing, goHome)
+            AdminPhase8Screen.APPEARANCE -> DisplayAppearanceScreen(editing, configSaveState, updateWorking, saveEditing, goHome)
             AdminPhase8Screen.DEVICE -> DeviceStatusScreen(paired.device.serviceName, goHome)
         }
     }
 
-    private fun saveConfig(
-        draft: AdminOperationalDraft,
+    private fun openMedia(paired: AdminRuntimeState.Paired) {
+        mediaMode = true
+        mediaSelectionError = null
+        pairingExecutor.execute { refreshMediaList(paired) }
+    }
+
+    private fun refreshMediaList(paired: AdminRuntimeState.Paired) {
+        mediaClient.list(paired.device, paired.credentialId).fold(
+            onSuccess = { items -> mainHandler.post { mediaExistingItems = items } },
+            onFailure = { failure ->
+                mainHandler.post {
+                    mediaSelectionError = failure.message ?: "Daftar media TV tidak dapat dimuat"
+                }
+            },
+        )
+    }
+
+    private fun deleteMedia(
         paired: AdminRuntimeState.Paired,
-        onSuccess: () -> Unit,
+        transfer: MediaTransferCoordinator,
+        mediaId: String,
     ) {
+        pairingExecutor.execute {
+            if (transfer.items.any { it.source.mediaId == mediaId }) {
+                transfer.delete(mediaId) { snapshot -> mainHandler.post { mediaTransferItems = snapshot } }
+            } else {
+                mediaClient.delete(paired.device, paired.credentialId, mediaId).onFailure { failure ->
+                    mainHandler.post { mediaSelectionError = failure.message ?: "Media gagal dihapus" }
+                }
+            }
+            refreshMediaList(paired)
+        }
+    }
+
+    private fun saveConfig(draft: AdminOperationalDraft, paired: AdminRuntimeState.Paired, onSuccess: () -> Unit) {
         if (configSaveState is ConfigSaveState.Sending) return
         val request = runCatching { draft.toRequest(paired.credentialId, mosqueId) }.getOrElse {
             configSaveState = ConfigSaveState.Error(it.message ?: "Konfigurasi tidak valid")
@@ -263,9 +309,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     },
-                    onFailure = {
-                        configSaveState = ConfigSaveState.Error("TV tidak dapat menyimpan konfigurasi melalui LAN")
-                    },
+                    onFailure = { configSaveState = ConfigSaveState.Error("TV tidak dapat menyimpan konfigurasi melalui LAN") },
                 )
             }
         }
@@ -315,18 +359,12 @@ internal fun AdminPairingScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text("Masjid Display", color = AdminTextPrimary, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Hubungkan TV",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = AdminTextPrimary,
-                    fontWeight = FontWeight.Bold,
-                )
+                Text("Hubungkan TV", style = MaterialTheme.typography.headlineMedium, color = AdminTextPrimary, fontWeight = FontWeight.Bold)
                 Text(
                     "TV ditemukan otomatis melalui jaringan lokal. Tidak perlu memasukkan alamat IP.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = AdminTextSecondary,
                 )
-
                 OutlinedTextField(
                     value = fallbackCode,
                     onValueChange = onFallbackCodeChanged,
@@ -335,55 +373,29 @@ internal fun AdminPairingScreen(
                     label = { Text("Kode pairing dari TV") },
                     supportingText = { Text("Scan QR akan tersedia; masukkan kode fallback yang tampil di TV.") },
                 )
-
                 when (state) {
                     AdminRuntimeState.Discovering -> StatusCard(
-                        title = "Mencari TV di jaringan lokal…",
-                        body = "Pastikan TV dan perangkat Admin berada pada LAN/Wi-Fi yang sama dan menu pairing TV aktif.",
+                        "Mencari TV di jaringan lokal…",
+                        "Pastikan TV dan perangkat Admin berada pada LAN/Wi-Fi yang sama dan menu pairing TV aktif.",
                     )
-
                     is AdminRuntimeState.Devices -> {
                         if (state.items.isEmpty()) {
-                            StatusCard(
-                                title = "Belum ada TV ditemukan",
-                                body = "Discovery tetap lokal. Coba lagi setelah memastikan TV siap dipasangkan.",
-                            )
+                            StatusCard("Belum ada TV ditemukan", "Discovery tetap lokal. Coba lagi setelah memastikan TV siap dipasangkan.")
                             ActionButton("Cari lagi", onRetry)
                         } else {
-                            Text(
-                                "Pilih TV",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = AdminTextPrimary,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            state.items.take(4).forEach { device ->
-                                DeviceCard(device = device, onPair = { onPair(device) })
-                            }
+                            Text("Pilih TV", style = MaterialTheme.typography.titleMedium, color = AdminTextPrimary, fontWeight = FontWeight.SemiBold)
+                            state.items.take(4).forEach { device -> DeviceCard(device) { onPair(device) } }
                         }
                     }
-
-                    is AdminRuntimeState.Pairing -> StatusCard(
-                        title = "Menghubungkan ${state.device.serviceName}",
-                        body = "Melakukan handshake pairing langsung melalui LAN…",
-                    )
-
-                    is AdminRuntimeState.Paired -> StatusCard(
-                        title = "TV berhasil terhubung",
-                        body = "${state.device.serviceName} menerima credential pairing tepercaya.",
-                    )
-
+                    is AdminRuntimeState.Pairing -> StatusCard("Menghubungkan ${state.device.serviceName}", "Melakukan handshake pairing langsung melalui LAN…")
+                    is AdminRuntimeState.Paired -> StatusCard("TV berhasil terhubung", "${state.device.serviceName} menerima credential pairing tepercaya.")
                     is AdminRuntimeState.Error -> {
-                        StatusCard(title = "Pairing belum berhasil", body = state.message)
+                        StatusCard("Pairing belum berhasil", state.message)
                         ActionButton("Coba lagi", onRetry)
                     }
                 }
-
                 Spacer(Modifier.weight(1f))
-                Text(
-                    "Koneksi pairing berlangsung langsung ke TV di jaringan lokal.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AdminTextSecondary,
-                )
+                Text("Koneksi pairing berlangsung langsung ke TV di jaringan lokal.", style = MaterialTheme.typography.bodySmall, color = AdminTextSecondary)
             }
         }
     }
@@ -392,44 +404,25 @@ internal fun AdminPairingScreen(
 @Composable
 private fun DeviceCard(device: DiscoveredTvService, onPair: () -> Unit) {
     val compatible = device.negotiation is ProtocolNegotiation.Accepted
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = AdminSurface,
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = AdminSurface) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(device.serviceName, color = AdminTextPrimary, fontWeight = FontWeight.SemiBold)
-            Text(
-                if (compatible) "Siap dipasangkan" else "Versi protokol tidak kompatibel",
-                color = AdminTextSecondary,
-            )
+            Text(if (compatible) "Siap dipasangkan" else "Versi protokol tidak kompatibel", color = AdminTextSecondary)
             Button(
                 onClick = onPair,
                 enabled = compatible,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AdminAccent, contentColor = AdminOnAccent),
-            ) {
-                Text("Hubungkan TV", fontWeight = FontWeight.SemiBold)
-            }
+            ) { Text("Hubungkan TV", fontWeight = FontWeight.SemiBold) }
         }
     }
 }
 
 @Composable
 private fun StatusCard(title: String, body: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = AdminSurface,
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = AdminSurface) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = AdminTextPrimary, fontWeight = FontWeight.SemiBold)
             Text(body, color = AdminTextSecondary)
         }
@@ -443,7 +436,5 @@ private fun ActionButton(label: String, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth().height(56.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = AdminAccent, contentColor = AdminOnAccent),
-    ) {
-        Text(label, fontWeight = FontWeight.SemiBold)
-    }
+    ) { Text(label, fontWeight = FontWeight.SemiBold) }
 }
