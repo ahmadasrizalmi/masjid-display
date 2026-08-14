@@ -100,7 +100,7 @@ class AdminPairingCoordinatorTest {
         )
 
         coordinator.onStart()
-        queuedDispatch.removeFirst().invoke()
+        queuedDispatch.removeAt(0).invoke()
         coordinator.pair(device)
         queuedPairing.single().invoke()
         coordinator.onStop()
