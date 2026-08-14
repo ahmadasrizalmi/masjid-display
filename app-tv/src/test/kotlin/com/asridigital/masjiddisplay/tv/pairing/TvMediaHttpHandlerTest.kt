@@ -3,6 +3,8 @@ package com.asridigital.masjiddisplay.tv.pairing
 import com.asridigital.masjiddisplay.database.MediaItemDao
 import com.asridigital.masjiddisplay.database.MediaItemEntity
 import com.asridigital.masjiddisplay.media.AtomicMediaStore
+import com.asridigital.masjiddisplay.protocol.MediaListRequest
+import com.asridigital.masjiddisplay.protocol.MediaListResponse
 import com.asridigital.masjiddisplay.protocol.MediaMutationResponse
 import com.asridigital.masjiddisplay.protocol.MediaSessionResponse
 import com.asridigital.masjiddisplay.protocol.MediaTransportPaths
@@ -34,6 +36,52 @@ class TvMediaHttpHandlerTest {
 
         assertEquals(403, response.status)
         assertIs<MediaSessionResponse.Rejected>(MediaWireContract.decodeSessionResponse(response.body))
+    }
+
+    @Test
+    fun trustedListReadsPersistedRoomMetadata() {
+        val dao = FakeMediaDao()
+        dao.items.value = listOf(
+            MediaItemEntity(
+                id = "media-existing",
+                localFilename = "media-existing.jpg",
+                mediaType = "image/jpeg",
+                byteSize = 42,
+                checksum = "a".repeat(64),
+                width = null,
+                height = null,
+                createdAtEpochMillis = 123L,
+                enabled = true,
+            ),
+        )
+        val handler = handler(dao = dao)
+
+        val response = handler.handleControl(
+            PairingHttpRequest(
+                "POST",
+                MediaTransportPaths.LIST,
+                MediaWireContract.encodeListRequest(MediaListRequest("credential")),
+            ),
+        )
+
+        assertEquals(200, response.status)
+        val listed = assertIs<MediaListResponse.Success>(MediaWireContract.decodeListResponse(response.body))
+        assertEquals("media-existing", listed.items.single().mediaId)
+        assertEquals("media-existing.jpg", listed.items.single().filename)
+    }
+
+    @Test
+    fun untrustedCredentialCannotListPersistedMedia() {
+        val response = handler(trusted = false).handleControl(
+            PairingHttpRequest(
+                "POST",
+                MediaTransportPaths.LIST,
+                MediaWireContract.encodeListRequest(MediaListRequest("credential")),
+            ),
+        )
+
+        assertEquals(403, response.status)
+        assertIs<MediaListResponse.Rejected>(MediaWireContract.decodeListResponse(response.body))
     }
 
     @Test
@@ -118,6 +166,7 @@ class TvMediaHttpHandlerTest {
     private class FakeMediaDao : MediaItemDao {
         val items = MutableStateFlow<List<MediaItemEntity>>(emptyList())
         override fun observeAll(): Flow<List<MediaItemEntity>> = items
+        override suspend fun getAll(): List<MediaItemEntity> = items.value.sortedByDescending { it.createdAtEpochMillis }
         override suspend fun upsert(item: MediaItemEntity) {
             items.value = items.value.filterNot { it.id == item.id } + item
         }
