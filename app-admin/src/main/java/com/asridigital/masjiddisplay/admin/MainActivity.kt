@@ -55,6 +55,7 @@ import com.asridigital.masjiddisplay.admin.pairing.LanPairingTransportClient
 import com.asridigital.masjiddisplay.admin.setup.MosqueSetupDraft
 import com.asridigital.masjiddisplay.admin.setup.MosqueSetupScreen
 import com.asridigital.masjiddisplay.protocol.DiscoveredTvService
+import com.asridigital.masjiddisplay.protocol.MediaListItem
 import com.asridigital.masjiddisplay.protocol.ProtocolNegotiation
 import com.asridigital.masjiddisplay.protocol.TvConfigUpdateResponse
 import java.time.ZoneId
@@ -73,6 +74,7 @@ class MainActivity : ComponentActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val pairingExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val configClient = LanConfigTransportClient()
+    private val mediaClient = LanMediaTransferClient()
     private lateinit var coordinator: AdminPairingCoordinator
     private lateinit var mosqueId: String
     private var mediaCoordinator: MediaTransferCoordinator? = null
@@ -87,6 +89,7 @@ class MainActivity : ComponentActivity() {
     private var configSaveState by mutableStateOf<ConfigSaveState>(ConfigSaveState.Idle)
     private var mediaMode by mutableStateOf(false)
     private var mediaTransferItems by mutableStateOf<List<MediaTransferItem>>(emptyList())
+    private var mediaExistingItems by mutableStateOf<List<MediaListItem>>(emptyList())
     private var mediaSelectionError by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -162,11 +165,12 @@ class MainActivity : ComponentActivity() {
     private fun RuntimeScreens(paired: AdminRuntimeState.Paired, committed: AdminOperationalDraft) {
         if (mediaMode) {
             val transfer = mediaCoordinator ?: MediaTransferCoordinator(
-                client = LanMediaTransferClient(),
+                client = mediaClient,
                 device = paired.device,
                 credentialId = paired.credentialId,
             ).also { mediaCoordinator = it }
             MediaTransferScreen(
+                existingItems = mediaExistingItems,
                 transferItems = mediaTransferItems,
                 selectionError = mediaSelectionError,
                 onPicked = { uris ->
@@ -185,18 +189,16 @@ class MainActivity : ComponentActivity() {
                             mediaTransferItems = transfer.items
                             mediaSelectionError = firstError
                         }
+                        refreshMediaList(paired)
                     }
                 },
                 onRetry = { mediaId ->
                     pairingExecutor.execute {
                         transfer.retry(mediaId) { snapshot -> mainHandler.post { mediaTransferItems = snapshot } }
+                        refreshMediaList(paired)
                     }
                 },
-                onDelete = { mediaId ->
-                    pairingExecutor.execute {
-                        transfer.delete(mediaId) { snapshot -> mainHandler.post { mediaTransferItems = snapshot } }
-                    }
-                },
+                onDelete = { mediaId -> deleteMedia(paired, transfer, mediaId) },
                 onBack = { mediaMode = false },
             )
             return
@@ -232,7 +234,7 @@ class MainActivity : ComponentActivity() {
                 draft = committed,
                 deviceName = paired.device.serviceName,
                 onNavigate = navigate,
-                onMedia = { mediaMode = true },
+                onMedia = { openMedia(paired) },
             )
 
             AdminPhase8Screen.MOSQUE -> MosqueInformationScreen(
@@ -248,6 +250,40 @@ class MainActivity : ComponentActivity() {
             AdminPhase8Screen.ANNOUNCEMENTS -> AnnouncementsScreen(editing, configSaveState, updateWorking, saveEditing, goHome)
             AdminPhase8Screen.APPEARANCE -> DisplayAppearanceScreen(editing, configSaveState, updateWorking, saveEditing, goHome)
             AdminPhase8Screen.DEVICE -> DeviceStatusScreen(paired.device.serviceName, goHome)
+        }
+    }
+
+    private fun openMedia(paired: AdminRuntimeState.Paired) {
+        mediaMode = true
+        mediaSelectionError = null
+        pairingExecutor.execute { refreshMediaList(paired) }
+    }
+
+    private fun refreshMediaList(paired: AdminRuntimeState.Paired) {
+        mediaClient.list(paired.device, paired.credentialId).fold(
+            onSuccess = { items -> mainHandler.post { mediaExistingItems = items } },
+            onFailure = { failure ->
+                mainHandler.post {
+                    mediaSelectionError = failure.message ?: "Daftar media TV tidak dapat dimuat"
+                }
+            },
+        )
+    }
+
+    private fun deleteMedia(
+        paired: AdminRuntimeState.Paired,
+        transfer: MediaTransferCoordinator,
+        mediaId: String,
+    ) {
+        pairingExecutor.execute {
+            if (transfer.items.any { it.source.mediaId == mediaId }) {
+                transfer.delete(mediaId) { snapshot -> mainHandler.post { mediaTransferItems = snapshot } }
+            } else {
+                mediaClient.delete(paired.device, paired.credentialId, mediaId).onFailure { failure ->
+                    mainHandler.post { mediaSelectionError = failure.message ?: "Media gagal dihapus" }
+                }
+            }
+            refreshMediaList(paired)
         }
     }
 
