@@ -20,6 +20,27 @@ class MediaWireContractTest {
     }
 
     @Test
+    fun listRequestAndPersistedItemsRoundTrip() {
+        val request = MediaListRequest("trusted-admin")
+        assertEquals(request, MediaWireContract.decodeListRequest(MediaWireContract.encodeListRequest(request)))
+
+        val response = MediaListResponse.Success(
+            listOf(
+                MediaListItem(
+                    mediaId = "media-1",
+                    filename = "media-1.jpg",
+                    mimeType = "image/jpeg",
+                    byteSize = 2048,
+                    sha256 = "b".repeat(64),
+                    createdAtEpochMillis = 123456L,
+                    enabled = true,
+                ),
+            ),
+        )
+        assertEquals(response, MediaWireContract.decodeListResponse(MediaWireContract.encodeListResponse(response)))
+    }
+
+    @Test
     fun acceptedSessionAndMutationResponsesRoundTrip() {
         val session = MediaSessionResponse.Accepted("session-123")
         assertEquals(session, MediaWireContract.decodeSessionResponse(MediaWireContract.encodeSessionResponse(session)))
@@ -29,6 +50,7 @@ class MediaWireContractTest {
     @Test
     fun malformedSessionMetadataIsRejectedByDecoder() {
         assertEquals(null, MediaWireContract.decodeSessionRequest("credentialId=x&mediaId=y"))
+        assertEquals(null, MediaWireContract.decodeListRequest("credential="))
     }
 
     @Test
