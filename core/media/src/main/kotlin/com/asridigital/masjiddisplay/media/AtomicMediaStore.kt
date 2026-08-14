@@ -47,10 +47,6 @@ enum class MediaStoreError {
     IO_FAILURE,
 }
 
-/**
- * Platform-neutral TV storage boundary for one media item.
- * Bytes are written to a temp file, verified, then atomically promoted where supported.
- */
 class AtomicMediaStore(private val root: Path) : Closeable {
     private val tempDir = root.resolve(".incoming")
     private val mediaDir = root.resolve("media")
@@ -81,40 +77,33 @@ class AtomicMediaStore(private val root: Path) : Closeable {
                     output.write(buffer, 0, count)
                 }
             }
-
-            if (overflow || written != spec.expectedBytes) {
-                return rejectAndDelete(temp, MediaStoreError.SIZE_MISMATCH)
-            }
-
+            if (overflow || written != spec.expectedBytes) return rejectAndDelete(temp, MediaStoreError.SIZE_MISMATCH)
             val actualSha = digest.digest().joinToString("") { "%02x".format(it) }
             if (!actualSha.equals(spec.expectedSha256, ignoreCase = true)) {
                 return rejectAndDelete(temp, MediaStoreError.CHECKSUM_MISMATCH)
             }
-
-            val extension = extensionFor(spec.mimeType)
-            val destination = mediaDir.resolve("${spec.mediaId}.$extension")
+            val destination = mediaDir.resolve("${spec.mediaId}.${extensionFor(spec.mimeType)}")
             try {
                 Files.move(temp, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
             } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
                 Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING)
             }
-            MediaStoreResult.Success(
-                StoredMedia(spec.mediaId, destination.fileName.toString(), written, actualSha, destination),
-            )
+            MediaStoreResult.Success(StoredMedia(spec.mediaId, destination.fileName.toString(), written, actualSha, destination))
         } catch (_: Exception) {
             Files.deleteIfExists(temp)
             MediaStoreResult.Rejected(MediaStoreError.IO_FAILURE)
         }
     }
 
-    fun delete(mediaId: String): Boolean {
+    fun pathFor(mediaId: String): Path? {
         require(mediaId.matches(safeMediaId)) { "Media id contains unsafe characters" }
         val prefix = "$mediaId."
         Files.list(mediaDir).use { paths ->
-            val match = paths.filter { it.fileName.toString().startsWith(prefix) }.findFirst()
-            return match.map(Files::deleteIfExists).orElse(false)
+            return paths.filter { it.fileName.toString().startsWith(prefix) }.findFirst().orElse(null)
         }
     }
+
+    fun delete(mediaId: String): Boolean = pathFor(mediaId)?.let(Files::deleteIfExists) ?: false
 
     override fun close() = Unit
 
