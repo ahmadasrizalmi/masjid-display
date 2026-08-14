@@ -9,32 +9,23 @@ import java.util.UUID
 
 class AndroidLocalMediaSource private constructor(
     private val resolver: ContentResolver,
-    private val uri: Uri,
+    val previewUri: Uri,
     override val mediaId: String,
     override val filename: String,
     override val mimeType: String,
     override val byteSize: Long,
     override val sha256: String,
 ) : LocalMediaSource {
-    override fun openStream(): InputStream = resolver.openInputStream(uri)
+    override fun openStream(): InputStream = resolver.openInputStream(previewUri)
         ?: error("Media tidak dapat dibuka")
 
     companion object {
         fun from(resolver: ContentResolver, uri: Uri): AndroidLocalMediaSource {
             val mimeType = resolver.getType(uri) ?: error("Tipe media tidak diketahui")
-            require(mimeType in setOf("image/jpeg", "image/png", "image/webp")) {
-                "Format media belum didukung"
-            }
-            val displayName = resolver.query(
-                uri,
-                arrayOf(OpenableColumns.DISPLAY_NAME),
-                null,
-                null,
-                null,
-            )?.use { cursor ->
+            require(mimeType in setOf("image/jpeg", "image/png", "image/webp")) { "Format media belum didukung" }
+            val displayName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) cursor.getString(0) else null
             } ?: "media"
-
             val digest = MessageDigest.getInstance("SHA-256")
             var bytes = 0L
             resolver.openInputStream(uri)?.use { input ->
@@ -49,10 +40,9 @@ class AndroidLocalMediaSource private constructor(
                 }
             } ?: error("Media tidak dapat dibuka")
             require(bytes > 0) { "Media kosong" }
-
             return AndroidLocalMediaSource(
                 resolver = resolver,
-                uri = uri,
+                previewUri = uri,
                 mediaId = UUID.randomUUID().toString(),
                 filename = displayName,
                 mimeType = mimeType,
