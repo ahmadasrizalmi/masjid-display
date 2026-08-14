@@ -24,7 +24,7 @@ class AdminPairingCoordinatorTest {
         coordinator.onStart()
 
         assertEquals(1, starts)
-        assertEquals(listOf(AdminRuntimeState.Discovering), states)
+        assertEquals(listOf<AdminRuntimeState>(AdminRuntimeState.Discovering), states)
     }
 
     @Test
@@ -106,7 +106,7 @@ class AdminPairingCoordinatorTest {
         coordinator.onStop()
         queuedDispatch.forEach { it.invoke() }
 
-        assertEquals(listOf(AdminRuntimeState.Discovering), states)
+        assertEquals(listOf<AdminRuntimeState>(AdminRuntimeState.Discovering), states)
         assertTrue(queuedDispatch.isNotEmpty())
     }
 
