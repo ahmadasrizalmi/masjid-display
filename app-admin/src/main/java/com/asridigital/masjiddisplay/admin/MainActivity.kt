@@ -39,6 +39,7 @@ import com.asridigital.masjiddisplay.admin.config.DisplayAppearanceScreen
 import com.asridigital.masjiddisplay.admin.config.FridaySettingsScreen
 import com.asridigital.masjiddisplay.admin.config.IqamahSettingsScreen
 import com.asridigital.masjiddisplay.admin.config.LanConfigTransportClient
+import com.asridigital.masjiddisplay.admin.config.MosqueInformationScreen
 import com.asridigital.masjiddisplay.admin.config.PrayerSettingsScreen
 import com.asridigital.masjiddisplay.admin.config.SetupReviewScreen
 import com.asridigital.masjiddisplay.admin.discovery.AdminNsdDiscovery
@@ -183,6 +184,14 @@ class MainActivity : ComponentActivity() {
         when (phase8Screen) {
             AdminPhase8Screen.REVIEW,
             AdminPhase8Screen.HOME -> AdminHomeScreen(committed, paired.device.serviceName, navigate)
+
+            AdminPhase8Screen.MOSQUE -> MosqueInformationScreen(
+                draft = editing,
+                saveState = configSaveState,
+                onDraftChanged = updateWorking,
+                onSave = saveEditing,
+                onBack = goHome,
+            )
 
             AdminPhase8Screen.PRAYER -> PrayerSettingsScreen(
                 draft = editing,

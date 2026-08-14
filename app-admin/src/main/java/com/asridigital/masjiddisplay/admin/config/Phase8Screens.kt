@@ -43,6 +43,7 @@ private val ErrorColor = Color(0xFFB3261E)
 internal enum class AdminPhase8Screen {
     REVIEW,
     HOME,
+    MOSQUE,
     PRAYER,
     IQAMAH,
     FRIDAY,
@@ -81,6 +82,7 @@ internal fun AdminHomeScreen(
     Screen(title = draft.mosque.name, subtitle = draft.mosque.locationLabel) {
         SummaryCard("TV Utama · Terhubung langsung", deviceName)
         SectionTitle("PENGATURAN UTAMA")
+        SettingsCard("Informasi Masjid", "Nama, lokasi, koordinat, timezone") { onNavigate(AdminPhase8Screen.MOSQUE) }
         SettingsCard("Jadwal Sholat", "Koreksi waktu per sholat") { onNavigate(AdminPhase8Screen.PRAYER) }
         SettingsCard("Adzan & Iqamah", "Durasi iqamah per sholat") { onNavigate(AdminPhase8Screen.IQAMAH) }
         SettingsCard("Jumat", if (draft.fridayEnabled) "Aktif" else "Nonaktif") { onNavigate(AdminPhase8Screen.FRIDAY) }
@@ -89,6 +91,61 @@ internal fun AdminHomeScreen(
         SectionTitle("DISPLAY")
         SettingsCard("Tampilan", draft.normalLayoutMode) { onNavigate(AdminPhase8Screen.APPEARANCE) }
         SettingsCard("Perangkat", "Status dan koneksi TV") { onNavigate(AdminPhase8Screen.DEVICE) }
+    }
+}
+
+@Composable
+internal fun MosqueInformationScreen(
+    draft: AdminOperationalDraft,
+    saveState: ConfigSaveState,
+    onDraftChanged: (AdminOperationalDraft) -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val mosque = draft.mosque
+    val valid = mosque.validate().isValid
+    Screen(title = "Informasi Masjid", subtitle = "Identitas dan lokasi untuk perhitungan jadwal lokal.", onBack = onBack) {
+        OutlinedTextField(
+            value = mosque.name,
+            onValueChange = { onDraftChanged(draft.copy(mosque = mosque.copy(name = it))) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Nama masjid") },
+        )
+        OutlinedTextField(
+            value = mosque.locationLabel,
+            onValueChange = { onDraftChanged(draft.copy(mosque = mosque.copy(locationLabel = it))) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Lokasi") },
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(
+                value = mosque.latitude,
+                onValueChange = { onDraftChanged(draft.copy(mosque = mosque.copy(latitude = it))) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                label = { Text("Latitude") },
+            )
+            OutlinedTextField(
+                value = mosque.longitude,
+                onValueChange = { onDraftChanged(draft.copy(mosque = mosque.copy(longitude = it))) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                label = { Text("Longitude") },
+            )
+        }
+        OutlinedTextField(
+            value = mosque.timezoneId,
+            onValueChange = { onDraftChanged(draft.copy(mosque = mosque.copy(timezoneId = it))) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Timezone") },
+        )
+        Text("Metode: ${mosque.prayerMethod.displayName}", color = TextSecondary)
+        if (!valid) Text("Lengkapi data masjid dengan nilai yang valid.", color = ErrorColor)
+        SaveStatus(saveState)
+        PrimaryButton("Simpan", valid && saveState !is ConfigSaveState.Sending, onSave)
     }
 }
 
@@ -183,8 +240,9 @@ internal fun FridaySettingsScreen(
             singleLine = true,
             label = { Text("Selesai") },
         )
+        draft.validate().filter { it.contains("Jumat") }.forEach { Text(it, color = ErrorColor) }
         SaveStatus(saveState)
-        PrimaryButton("Simpan", saveState !is ConfigSaveState.Sending, onSave)
+        PrimaryButton("Simpan", draft.validate().isEmpty() && saveState !is ConfigSaveState.Sending, onSave)
     }
 }
 
