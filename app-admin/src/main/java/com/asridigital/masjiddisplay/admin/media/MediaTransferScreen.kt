@@ -58,8 +58,8 @@ internal fun MediaTransferScreen(
     onPicked: (List<Uri>) -> Unit,
     onRetry: (String) -> Unit,
     onDelete: (String) -> Unit,
-    loadRemoteThumbnail: (String) -> ByteArray?,
     onBack: () -> Unit,
+    loadRemoteThumbnail: (String) -> ByteArray? = MediaThumbnailLoader::load,
 ) {
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(12)) { uris ->
@@ -109,9 +109,7 @@ internal fun MediaTransferScreen(
             onDismissRequest = { pendingDeleteId = null },
             title = { Text("Hapus media?") },
             text = { Text("Foto akan dihapus dari penyimpanan TV. Tindakan ini tidak dapat dibatalkan.") },
-            confirmButton = {
-                TextButton(onClick = { pendingDeleteId = null; onDelete(mediaId) }) { Text("Hapus", color = Error) }
-            },
+            confirmButton = { TextButton(onClick = { pendingDeleteId = null; onDelete(mediaId) }) { Text("Hapus", color = Error) } },
             dismissButton = { TextButton(onClick = { pendingDeleteId = null }) { Text("Batal") } },
         )
     }
@@ -135,13 +133,10 @@ private fun TransferProgressSummary(items: List<MediaTransferItem>) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Card) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Mengirim ${items.size} foto", color = Primary, fontWeight = FontWeight.SemiBold)
-            Text(
-                buildString {
-                    append("$completed selesai · $sending mengirim · $waiting menunggu")
-                    if (failed > 0) append(" · $failed gagal")
-                },
-                color = Secondary,
-            )
+            Text(buildString {
+                append("$completed selesai · $sending mengirim · $waiting menunggu")
+                if (failed > 0) append(" · $failed gagal")
+            }, color = Secondary)
             LinearProgressIndicator(progress = progress, modifier = Modifier.fillMaxWidth())
         }
     }
@@ -190,9 +185,7 @@ private fun TransferCard(item: MediaTransferItem, onRetry: (String) -> Unit, onD
 @Composable
 private fun RemoteThumbnail(mediaId: String, loader: (String) -> ByteArray?) {
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = mediaId) {
-        value = withContext(Dispatchers.IO) {
-            loader(mediaId)?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
-        }
+        value = withContext(Dispatchers.IO) { loader(mediaId)?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) } }
     }
     bitmap?.let {
         Image(
