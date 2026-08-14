@@ -10,8 +10,8 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
- * TV-local HTTP boundary for pairing only. The operating system selects a free LAN port; callers
- * advertise [port] through NSD. This server exposes no cloud or global endpoints.
+ * TV-local HTTP boundary. The operating system selects a free LAN port; callers advertise [port]
+ * through NSD. This server exposes no cloud or global endpoints.
  */
 class PairingLanServer(
     private val handler: PairingHttpHandler,
@@ -57,6 +57,7 @@ class PairingLanServer(
             val reason = when (response.status) {
                 200 -> "OK"
                 400 -> "Bad Request"
+                403 -> "Forbidden"
                 404 -> "Not Found"
                 405 -> "Method Not Allowed"
                 else -> "Internal Server Error"
@@ -122,6 +123,6 @@ class PairingLanServer(
         const val SOCKET_TIMEOUT_MILLIS = 5_000
         const val MAX_LINE_BYTES = 2_048
         const val MAX_HEADERS = 32
-        const val MAX_BODY_BYTES = 8_192
+        const val MAX_BODY_BYTES = 16_384
     }
 }

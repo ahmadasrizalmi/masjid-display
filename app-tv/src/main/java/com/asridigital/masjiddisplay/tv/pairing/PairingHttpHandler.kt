@@ -9,8 +9,14 @@ import com.asridigital.masjiddisplay.protocol.TvPairingTransportAdapter
 data class PairingHttpRequest(val method: String, val path: String, val body: String = "")
 data class PairingHttpResponse(val status: Int, val contentType: String, val body: String)
 
-class PairingHttpHandler(private val pairing: TvPairingTransportAdapter) {
+class PairingHttpHandler(
+    private val pairing: TvPairingTransportAdapter,
+    private val fallback: ((PairingHttpRequest) -> PairingHttpResponse)? = null,
+) {
     fun handle(request: PairingHttpRequest): PairingHttpResponse {
+        if (request.path !in setOf(PairingTransportPaths.OPEN, PairingTransportPaths.COMPLETE)) {
+            return fallback?.invoke(request) ?: response(404, "")
+        }
         if (request.method != "POST") return response(405, "")
         return when (request.path) {
             PairingTransportPaths.OPEN -> pairing.open()?.let { response(200, PairingWireContract.encodeOpen(it)) }

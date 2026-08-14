@@ -1,6 +1,9 @@
 package com.asridigital.masjiddisplay.protocol
 
-class TvPairingTransportAdapter(private val sessions: TvPairingSessionManager) {
+class TvPairingTransportAdapter(
+    private val sessions: TvPairingSessionManager,
+    private val onCredentialIssued: (TrustedAdminCredential) -> Unit = {},
+) {
     /** Must be invoked by the TV pairing screen; only that screen may display the returned secret. */
     fun beginPairingForTvDisplay(): PairingChallenge = sessions.open()
 
@@ -18,10 +21,13 @@ class TvPairingTransportAdapter(private val sessions: TvPairingSessionManager) {
                 protocolVersion = request.protocolVersion,
             )
         ) {
-            is PairingResult.Paired -> CompletePairingResponse.Success(
-                credentialId = result.credential.credentialId,
-                issuedAt = result.credential.issuedAt,
-            )
+            is PairingResult.Paired -> {
+                onCredentialIssued(result.credential)
+                CompletePairingResponse.Success(
+                    credentialId = result.credential.credentialId,
+                    issuedAt = result.credential.issuedAt,
+                )
+            }
             PairingResult.NoActiveSession -> CompletePairingResponse.Rejected(PairingErrorCode.NO_ACTIVE_SESSION)
             PairingResult.SessionExpired -> CompletePairingResponse.Rejected(PairingErrorCode.SESSION_EXPIRED)
             PairingResult.ProtocolMismatch -> CompletePairingResponse.Rejected(PairingErrorCode.PROTOCOL_MISMATCH)
