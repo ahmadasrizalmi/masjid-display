@@ -2,6 +2,9 @@ package com.asridigital.masjiddisplay.admin.media
 
 import com.asridigital.masjiddisplay.protocol.DiscoveredTvService
 import com.asridigital.masjiddisplay.protocol.MediaDeleteRequest
+import com.asridigital.masjiddisplay.protocol.MediaListItem
+import com.asridigital.masjiddisplay.protocol.MediaListRequest
+import com.asridigital.masjiddisplay.protocol.MediaListResponse
 import com.asridigital.masjiddisplay.protocol.MediaMutationResponse
 import com.asridigital.masjiddisplay.protocol.MediaSessionResponse
 import com.asridigital.masjiddisplay.protocol.MediaTransportPaths
@@ -34,6 +37,19 @@ interface MediaTransferClient {
 
 /** Direct-LAN media client. Host/port always come from NSD resolution, never fixed configuration. */
 class LanMediaTransferClient : MediaTransferClient {
+    fun list(device: DiscoveredTvService, credentialId: String): Result<List<MediaListItem>> = runCatching {
+        val body = postForm(
+            device,
+            MediaTransportPaths.LIST,
+            MediaWireContract.encodeListRequest(MediaListRequest(credentialId)),
+        )
+        when (val response = MediaWireContract.decodeListResponse(body)) {
+            is MediaListResponse.Success -> response.items
+            is MediaListResponse.Rejected -> error("${response.code}: ${response.message}")
+            null -> error("TV mengembalikan daftar media yang tidak valid")
+        }
+    }
+
     override fun upload(
         device: DiscoveredTvService,
         credentialId: String,
@@ -64,25 +80,29 @@ class LanMediaTransferClient : MediaTransferClient {
             setRequestProperty("Content-Type", MediaWireContract.BINARY_CONTENT_TYPE)
             setFixedLengthStreamingMode(source.byteSize)
         }
-        source.openStream().use { input ->
-            connection.outputStream.use { output ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                var sent = 0L
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    if (count == 0) continue
-                    output.write(buffer, 0, count)
-                    sent += count
-                    onProgress(sent, source.byteSize)
+        try {
+            source.openStream().use { input ->
+                connection.outputStream.use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var sent = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        if (count == 0) continue
+                        output.write(buffer, 0, count)
+                        sent += count
+                        onProgress(sent, source.byteSize)
+                    }
+                    require(sent == source.byteSize) { "Ukuran media berubah saat transfer" }
                 }
-                require(sent == source.byteSize) { "Ukuran media berubah saat transfer" }
             }
+            val responseBody = connection.readResponseBody()
+            val response = MediaWireContract.decodeMutationResponse(responseBody)
+                ?: error("TV mengembalikan response upload yang tidak valid")
+            if (response is MediaMutationResponse.Rejected) error("${response.code}: ${response.message}")
+        } finally {
+            connection.disconnect()
         }
-        val responseBody = connection.readResponseBody()
-        val response = MediaWireContract.decodeMutationResponse(responseBody)
-            ?: error("TV mengembalikan response upload yang tidak valid")
-        if (response is MediaMutationResponse.Rejected) error("${response.code}: ${response.message}")
     }
 
     override fun delete(device: DiscoveredTvService, credentialId: String, mediaId: String): Result<Unit> = runCatching {
@@ -108,8 +128,12 @@ class LanMediaTransferClient : MediaTransferClient {
             setRequestProperty("Content-Type", MediaWireContract.FORM_CONTENT_TYPE)
             setFixedLengthStreamingMode(bytes.size)
         }
-        connection.outputStream.use { it.write(bytes) }
-        return connection.readResponseBody()
+        return try {
+            connection.outputStream.use { it.write(bytes) }
+            connection.readResponseBody()
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun connection(device: DiscoveredTvService, path: String): HttpURLConnection =
@@ -124,6 +148,9 @@ class LanMediaTransferClient : MediaTransferClient {
             }
             MediaWireContract.decodeSessionResponse(body)?.let { response ->
                 if (response is MediaSessionResponse.Rejected) error("${response.code}: ${response.message}")
+            }
+            MediaWireContract.decodeListResponse(body)?.let { response ->
+                if (response is MediaListResponse.Rejected) error("${response.code}: ${response.message}")
             }
             error("HTTP $responseCode dari TV")
         }
