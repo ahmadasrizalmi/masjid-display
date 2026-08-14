@@ -7,6 +7,8 @@ import com.asridigital.masjiddisplay.media.MediaStoreError
 import com.asridigital.masjiddisplay.media.MediaStoreResult
 import com.asridigital.masjiddisplay.media.MediaUploadSpec
 import com.asridigital.masjiddisplay.protocol.MediaDeleteRequest
+import com.asridigital.masjiddisplay.protocol.MediaListItem
+import com.asridigital.masjiddisplay.protocol.MediaListResponse
 import com.asridigital.masjiddisplay.protocol.MediaMutationResponse
 import com.asridigital.masjiddisplay.protocol.MediaSessionResponse
 import com.asridigital.masjiddisplay.protocol.MediaTransportPaths
@@ -33,6 +35,7 @@ class TvMediaHttpHandler(
 
     fun handleControl(request: PairingHttpRequest): PairingHttpResponse = when (request.path) {
         MediaTransportPaths.CREATE_SESSION -> createSession(request)
+        MediaTransportPaths.LIST -> list(request)
         MediaTransportPaths.DELETE -> delete(request)
         else -> response(404, "")
     }
@@ -123,6 +126,31 @@ class TvMediaHttpHandler(
         return response(200, MediaWireContract.encodeSessionResponse(MediaSessionResponse.Accepted(sessionId)))
     }
 
+    private fun list(request: PairingHttpRequest): PairingHttpResponse {
+        if (request.method != "POST") return response(405, "")
+        val listRequest = MediaWireContract.decodeListRequest(request.body)
+            ?: return rejectedList(400, "MALFORMED_REQUEST", "Permintaan daftar media tidak dapat dibaca")
+        if (!isCredentialTrusted(listRequest.credentialId)) {
+            return rejectedList(403, "UNAUTHORIZED", "Credential Admin tidak dikenal")
+        }
+        return try {
+            val items = runBlocking { mediaDao.getAll() }.map { entity ->
+                MediaListItem(
+                    mediaId = entity.id,
+                    filename = entity.localFilename,
+                    mimeType = entity.mediaType,
+                    byteSize = entity.byteSize,
+                    sha256 = entity.checksum,
+                    createdAtEpochMillis = entity.createdAtEpochMillis,
+                    enabled = entity.enabled,
+                )
+            }
+            response(200, MediaWireContract.encodeListResponse(MediaListResponse.Success(items)))
+        } catch (_: Exception) {
+            rejectedList(500, "LIST_FAILED", "TV gagal membaca daftar media")
+        }
+    }
+
     private fun delete(request: PairingHttpRequest): PairingHttpResponse {
         if (request.method != "POST") return response(405, "")
         val delete = MediaWireContract.decodeDeleteRequest(request.body)
@@ -147,6 +175,11 @@ class TvMediaHttpHandler(
     private fun rejectedSession(status: Int, code: String, message: String) = response(
         status,
         MediaWireContract.encodeSessionResponse(MediaSessionResponse.Rejected(code, message)),
+    )
+
+    private fun rejectedList(status: Int, code: String, message: String) = response(
+        status,
+        MediaWireContract.encodeListResponse(MediaListResponse.Rejected(code, message)),
     )
 
     private fun rejectedMutation(status: Int, code: String, message: String) = response(
