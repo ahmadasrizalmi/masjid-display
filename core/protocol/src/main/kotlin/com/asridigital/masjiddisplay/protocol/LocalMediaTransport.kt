@@ -10,6 +10,8 @@ object MediaTransportPaths {
     const val DELETE = "/v1/media/delete"
 }
 
+private val safeMediaIdPattern = Regex("[A-Za-z0-9_-]{1,64}")
+
 data class MediaUploadSessionRequest(
     val credentialId: String,
     val mediaId: String,
@@ -20,7 +22,7 @@ data class MediaUploadSessionRequest(
 ) {
     init {
         require(credentialId.isNotBlank())
-        require(mediaId.isNotBlank())
+        require(mediaId.matches(safeMediaIdPattern))
         require(filename.isNotBlank())
         require(mimeType in setOf("image/jpeg", "image/png", "image/webp"))
         require(byteSize in 1..50L * 1024L * 1024L)
@@ -31,12 +33,14 @@ data class MediaUploadSessionRequest(
 data class MediaDeleteRequest(val credentialId: String, val mediaId: String) {
     init {
         require(credentialId.isNotBlank())
-        require(mediaId.isNotBlank())
+        require(mediaId.matches(safeMediaIdPattern))
     }
 }
 
 sealed interface MediaSessionResponse {
-    data class Accepted(val sessionId: String) : MediaSessionResponse
+    data class Accepted(val sessionId: String) : MediaSessionResponse {
+        init { require(sessionId.isNotBlank()) }
+    }
     data class Rejected(val code: String, val message: String) : MediaSessionResponse
 }
 
