@@ -71,8 +71,8 @@ class MainActivity : ComponentActivity() {
             runtime = runtime,
             startDiscovery = discovery::start,
             stopDiscovery = discovery::stop,
-            executePairing = { task -> pairingExecutor.execute(task) },
-            dispatchState = { task -> mainHandler.post(task) },
+            executePairing = { task -> pairingExecutor.execute { task() } },
+            dispatchState = { task -> mainHandler.post { task() } },
             onStateChanged = { uiState = it },
         )
 
