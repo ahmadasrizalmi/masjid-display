@@ -17,6 +17,7 @@ sealed interface LocalRequest {
     data class GetDeviceInfo(override val protocolVersion: Int) : LocalRequest
     data class GetStatus(override val protocolVersion: Int) : LocalRequest
     data class GetConfig(override val protocolVersion: Int) : LocalRequest
+    data class ListMedia(override val protocolVersion: Int) : LocalRequest
 }
 
 sealed interface ProtocolNegotiation {
