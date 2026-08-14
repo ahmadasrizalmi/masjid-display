@@ -2,9 +2,14 @@ package com.asridigital.masjiddisplay.tv.pairing
 
 import com.asridigital.masjiddisplay.tv.discovery.TvNsdAdvertiser
 
+interface PairingLanAdvertiser {
+    fun start(port: Int)
+    fun stop()
+}
+
 class TvPairingLanRuntime(
     private val server: PairingLanServer,
-    private val advertiser: TvNsdAdvertiser,
+    private val advertiser: PairingLanAdvertiser,
 ) : AutoCloseable {
     private var started = false
 

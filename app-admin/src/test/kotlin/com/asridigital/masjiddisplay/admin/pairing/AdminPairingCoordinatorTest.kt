@@ -57,7 +57,7 @@ class AdminPairingCoordinatorTest {
 
         coordinator.onStart()
         coordinator.onServicesChanged(listOf(device))
-        coordinator.pair(device)
+        coordinator.pair(device, "secret")
 
         assertEquals(1, queued.size)
         queued.single().invoke()
@@ -101,7 +101,7 @@ class AdminPairingCoordinatorTest {
 
         coordinator.onStart()
         queuedDispatch.removeAt(0).invoke()
-        coordinator.pair(device)
+        coordinator.pair(device, "secret")
         queuedPairing.single().invoke()
         coordinator.onStop()
         queuedDispatch.forEach { it.invoke() }
@@ -134,7 +134,7 @@ class AdminPairingCoordinatorTest {
 
     private class FakeTransport : AdminPairingTransportClient {
         override fun open(device: DiscoveredTvService): Result<OpenPairingResponse> = Result.success(
-            OpenPairingResponse("session", "secret", LocalProtocol.CURRENT_VERSION, Instant.EPOCH),
+            OpenPairingResponse("session", LocalProtocol.CURRENT_VERSION, Instant.EPOCH),
         )
 
         override fun complete(

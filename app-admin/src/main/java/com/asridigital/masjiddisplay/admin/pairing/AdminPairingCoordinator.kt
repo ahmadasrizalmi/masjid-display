@@ -1,6 +1,7 @@
 package com.asridigital.masjiddisplay.admin.pairing
 
 import com.asridigital.masjiddisplay.protocol.DiscoveredTvService
+import com.asridigital.masjiddisplay.protocol.PairingBootstrap
 
 class AdminPairingCoordinator(
     private val runtime: AdminPairingRuntime,
@@ -39,10 +40,10 @@ class AdminPairingCoordinator(
         publish(runtime.state)
     }
 
-    fun pair(device: DiscoveredTvService) {
-        if (!active) return
+    fun pair(device: DiscoveredTvService, fallbackCode: String) {
+        if (!active || fallbackCode.isBlank()) return
         executePairing {
-            runtime.pair(device) { state -> publish(state) }
+            runtime.pair(device, PairingBootstrap(fallbackCode)) { state -> publish(state) }
         }
     }
 

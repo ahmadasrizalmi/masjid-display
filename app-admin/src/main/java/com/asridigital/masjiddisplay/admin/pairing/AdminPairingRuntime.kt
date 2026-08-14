@@ -4,6 +4,7 @@ import com.asridigital.masjiddisplay.protocol.CompletePairingRequest
 import com.asridigital.masjiddisplay.protocol.CompletePairingResponse
 import com.asridigital.masjiddisplay.protocol.DiscoveredTvService
 import com.asridigital.masjiddisplay.protocol.OpenPairingResponse
+import com.asridigital.masjiddisplay.protocol.PairingBootstrap
 import com.asridigital.masjiddisplay.protocol.ProtocolNegotiation
 
 interface AdminPairingTransportClient {
@@ -37,8 +38,10 @@ class AdminPairingRuntime(private val transport: AdminPairingTransportClient) {
         state = AdminRuntimeState.Error("Discovery LAN gagal (kode $errorCode)")
     }
 
+    /** [bootstrap] must originate from the TV QR/fallback code, never from the LAN endpoint. */
     fun pair(
         device: DiscoveredTvService,
+        bootstrap: PairingBootstrap,
         onStateChanged: (AdminRuntimeState) -> Unit = {},
     ) {
         if (device.negotiation !is ProtocolNegotiation.Accepted) {
@@ -52,7 +55,7 @@ class AdminPairingRuntime(private val transport: AdminPairingTransportClient) {
         }
         val response = transport.complete(
             device,
-            CompletePairingRequest(challenge.sessionId, challenge.oneTimeSecret, challenge.protocolVersion),
+            CompletePairingRequest(challenge.sessionId, bootstrap.oneTimeSecret, challenge.protocolVersion),
         ).getOrElse {
             transition(AdminRuntimeState.Error("Koneksi pairing lokal gagal"), onStateChanged)
             return

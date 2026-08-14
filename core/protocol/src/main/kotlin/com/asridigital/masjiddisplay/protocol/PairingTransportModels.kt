@@ -7,7 +7,13 @@ object PairingTransportPaths {
     const val COMPLETE = "/v1/pairing/complete"
 }
 
-data class OpenPairingResponse(val sessionId: String, val oneTimeSecret: String, val protocolVersion: Int, val expiresAt: Instant)
+/** Public LAN metadata. The bootstrap secret stays on the TV QR/fallback code. */
+data class OpenPairingResponse(val sessionId: String, val protocolVersion: Int, val expiresAt: Instant)
+
+/** Material obtained by scanning the TV QR or entering its locally displayed fallback code. */
+data class PairingBootstrap(val oneTimeSecret: String) {
+    init { require(oneTimeSecret.isNotBlank()) }
+}
 data class CompletePairingRequest(val sessionId: String, val oneTimeSecret: String, val protocolVersion: Int)
 
 enum class PairingErrorCode { NO_ACTIVE_SESSION, SESSION_EXPIRED, PROTOCOL_MISMATCH, SECRET_MISMATCH, REPLAY_REJECTED, MALFORMED_REQUEST }

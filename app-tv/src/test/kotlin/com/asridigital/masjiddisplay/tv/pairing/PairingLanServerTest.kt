@@ -11,6 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class PairingLanServerTest {
     @Test
@@ -22,6 +23,7 @@ class PairingLanServerTest {
 
             val open = request(port, "POST /v1/pairing/open HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n")
             assertEquals("HTTP/1.1 200 OK", open.first())
+            assertTrue(open.none { it.contains("oneTimeSecret") })
 
             val methodRejected = request(port, "GET /v1/pairing/open HTTP/1.1\r\nHost: localhost\r\n\r\n")
             assertEquals("HTTP/1.1 405 Method Not Allowed", methodRejected.first())
@@ -53,6 +55,8 @@ class PairingLanServerTest {
             clock = Clock.fixed(java.time.Instant.EPOCH, ZoneOffset.UTC),
             material = PairingMaterialGenerator { tokens.next() },
         )
-        return PairingHttpHandler(TvPairingTransportAdapter(manager))
+        val adapter = TvPairingTransportAdapter(manager)
+        adapter.beginPairingForTvDisplay()
+        return PairingHttpHandler(adapter)
     }
 }

@@ -12,8 +12,10 @@ class PairingWireContractTest {
     }
 
     @Test fun openResponseRoundTrips() {
-        val response = OpenPairingResponse("session-1", "secret-1", 1, Instant.parse("2026-08-13T10:05:00Z"))
-        assertEquals(response, PairingWireContract.decodeOpen(PairingWireContract.encodeOpen(response)))
+        val response = OpenPairingResponse("session-1", 1, Instant.parse("2026-08-13T10:05:00Z"))
+        val encoded = PairingWireContract.encodeOpen(response)
+        assertEquals(response, PairingWireContract.decodeOpen(encoded))
+        assertNull(encoded.split('&').firstOrNull { it.startsWith("oneTimeSecret=") })
     }
 
     @Test fun successAndRejectedResultsRoundTrip() {

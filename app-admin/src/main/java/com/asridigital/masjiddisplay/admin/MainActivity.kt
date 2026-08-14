@@ -19,6 +19,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private val pairingExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private lateinit var coordinator: AdminPairingCoordinator
     private var uiState by mutableStateOf<AdminRuntimeState>(AdminRuntimeState.Discovering)
+    private var fallbackCode by mutableStateOf("")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,7 +81,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             AdminPairingScreen(
                 state = uiState,
-                onPair = coordinator::pair,
+                fallbackCode = fallbackCode,
+                onFallbackCodeChanged = { fallbackCode = it },
+                onPair = { device -> coordinator.pair(device, fallbackCode) },
                 onRetry = coordinator::retryDiscovery,
             )
         }
@@ -104,6 +108,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 internal fun AdminPairingScreen(
     state: AdminRuntimeState,
+    fallbackCode: String,
+    onFallbackCodeChanged: (String) -> Unit,
     onPair: (DiscoveredTvService) -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -124,6 +130,15 @@ internal fun AdminPairingScreen(
                     "TV ditemukan otomatis melalui jaringan lokal. Tidak perlu memasukkan alamat IP.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = AdminTextSecondary,
+                )
+
+                OutlinedTextField(
+                    value = fallbackCode,
+                    onValueChange = onFallbackCodeChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Kode pairing dari TV") },
+                    supportingText = { Text("Scan QR akan tersedia; masukkan kode fallback yang tampil di TV.") },
                 )
 
                 when (state) {

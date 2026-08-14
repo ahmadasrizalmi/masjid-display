@@ -27,7 +27,6 @@ object PairingWireContract {
 
     fun encodeOpen(response: OpenPairingResponse): String = form(
         "sessionId" to response.sessionId,
-        "oneTimeSecret" to response.oneTimeSecret,
         "protocolVersion" to response.protocolVersion.toString(),
         "expiresAt" to response.expiresAt.toString(),
     )
@@ -37,11 +36,10 @@ object PairingWireContract {
         return runCatching {
             OpenPairingResponse(
                 sessionId = values.getValue("sessionId"),
-                oneTimeSecret = values.getValue("oneTimeSecret"),
                 protocolVersion = values.getValue("protocolVersion").toInt(),
                 expiresAt = Instant.parse(values.getValue("expiresAt")),
             )
-        }.getOrNull()?.takeIf { it.sessionId.isNotBlank() && it.oneTimeSecret.isNotBlank() }
+        }.getOrNull()?.takeIf { it.sessionId.isNotBlank() }
     }
 
     fun encodeResult(response: CompletePairingResponse): String = when (response) {
