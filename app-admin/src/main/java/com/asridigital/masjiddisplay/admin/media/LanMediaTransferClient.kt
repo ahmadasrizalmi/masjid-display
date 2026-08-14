@@ -32,21 +32,26 @@ interface MediaTransferClient {
     fun delete(device: DiscoveredTvService, credentialId: String, mediaId: String): Result<Unit>
 }
 
+/** Bound when ListMedia succeeds, so MediaGrid can request previews from the same NSD-resolved TV. */
+internal object MediaThumbnailLoader {
+    @Volatile private var load: ((String) -> ByteArray?)? = null
+    fun bind(loader: (String) -> ByteArray?) { load = loader }
+    fun load(mediaId: String): ByteArray? = load?.invoke(mediaId)
+}
+
 class LanMediaTransferClient : MediaTransferClient {
     fun list(device: DiscoveredTvService, credentialId: String): Result<List<MediaListItem>> = runCatching {
-        when (val response = MediaWireContract.decodeListResponse(postForm(device, MediaTransportPaths.LIST, MediaWireContract.encodeListRequest(MediaListRequest(credentialId))))) {
+        val items = when (val response = MediaWireContract.decodeListResponse(postForm(device, MediaTransportPaths.LIST, MediaWireContract.encodeListRequest(MediaListRequest(credentialId))))) {
             is MediaListResponse.Success -> response.items
             is MediaListResponse.Rejected -> error("${response.code}: ${response.message}")
             null -> error("TV mengembalikan daftar media yang tidak valid")
         }
+        MediaThumbnailLoader.bind { mediaId -> thumbnail(device, credentialId, mediaId).getOrNull() }
+        items
     }
 
     fun thumbnail(device: DiscoveredTvService, credentialId: String, mediaId: String): Result<ByteArray> = runCatching {
-        val body = postForm(
-            device,
-            MediaTransportPaths.THUMBNAIL,
-            MediaWireContract.encodeThumbnailRequest(MediaThumbnailRequest(credentialId, mediaId)),
-        )
+        val body = postForm(device, MediaTransportPaths.THUMBNAIL, MediaWireContract.encodeThumbnailRequest(MediaThumbnailRequest(credentialId, mediaId)))
         when (val response = MediaWireContract.decodeThumbnailResponse(body)) {
             is MediaThumbnailResponse.Success -> Base64.decode(response.jpegBase64, Base64.DEFAULT)
             is MediaThumbnailResponse.Rejected -> error("${response.code}: ${response.message}")
