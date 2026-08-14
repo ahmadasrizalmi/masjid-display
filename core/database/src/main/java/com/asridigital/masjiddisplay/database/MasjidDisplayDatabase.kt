@@ -85,6 +85,9 @@ interface MediaItemDao {
     @Query("SELECT * FROM media_items ORDER BY createdAtEpochMillis DESC")
     fun observeAll(): Flow<List<MediaItemEntity>>
 
+    @Query("SELECT * FROM media_items ORDER BY createdAtEpochMillis DESC")
+    suspend fun getAll(): List<MediaItemEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: MediaItemEntity)
 
