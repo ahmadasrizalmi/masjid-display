@@ -14,16 +14,23 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.asridigital.masjiddisplay.protocol.MediaListItem
 
 private val Background = Color(0xFFF6F7F5)
 private val Card = Color.White
@@ -34,6 +41,7 @@ private val Error = Color(0xFFB3261E)
 
 @Composable
 internal fun MediaTransferScreen(
+    existingItems: List<MediaListItem>,
     transferItems: List<MediaTransferItem>,
     selectionError: String?,
     onPicked: (List<Uri>) -> Unit,
@@ -41,6 +49,7 @@ internal fun MediaTransferScreen(
     onDelete: (String) -> Unit,
     onBack: () -> Unit,
 ) {
+    var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(12)) { uris ->
         if (uris.isNotEmpty()) onPicked(uris)
     }
@@ -53,7 +62,7 @@ internal fun MediaTransferScreen(
                 OutlinedButton(onClick = onBack) { Text("Kembali") }
                 Text("Media", style = MaterialTheme.typography.headlineMedium, color = Primary, fontWeight = FontWeight.Bold)
                 Text(
-                    "Pilih beberapa foto. Transfer berlangsung langsung ke TV melalui LAN; item gagal dapat diulang sendiri.",
+                    "Foto yang sudah tersimpan dibaca langsung dari TV. Transfer baru berlangsung melalui LAN dan dapat diulang per item.",
                     color = Secondary,
                 )
                 Button(
@@ -62,9 +71,9 @@ internal fun MediaTransferScreen(
                 ) { Text("Pilih Foto") }
                 selectionError?.let { Text(it, color = Error) }
 
-                if (transferItems.isEmpty()) {
+                if (existingItems.isEmpty() && transferItems.isEmpty()) {
                     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Card) {
-                        Text("Belum ada media dipilih.", modifier = Modifier.padding(18.dp), color = Secondary)
+                        Text("Belum ada media di TV.", modifier = Modifier.padding(18.dp), color = Secondary)
                     }
                 } else {
                     LazyVerticalGrid(
@@ -73,12 +82,45 @@ internal fun MediaTransferScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(transferItems, key = { it.source.mediaId }) { item ->
-                            TransferCard(item, onRetry, onDelete)
+                        items(existingItems, key = { "remote-${it.mediaId}" }) { item ->
+                            ExistingMediaCard(item) { pendingDeleteId = item.mediaId }
+                        }
+                        items(transferItems, key = { "transfer-${it.source.mediaId}" }) { item ->
+                            TransferCard(item, onRetry) { pendingDeleteId = item.source.mediaId }
                         }
                     }
                 }
             }
+        }
+    }
+
+    pendingDeleteId?.let { mediaId ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteId = null },
+            title = { Text("Hapus media?") },
+            text = { Text("Foto akan dihapus dari penyimpanan TV. Tindakan ini tidak dapat dibatalkan.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDeleteId = null
+                        onDelete(mediaId)
+                    },
+                ) { Text("Hapus", color = Error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteId = null }) { Text("Batal") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun ExistingMediaCard(item: MediaListItem, onDelete: () -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = Card) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(item.filename, color = Primary, fontWeight = FontWeight.SemiBold, maxLines = 2)
+            Text("Tersimpan di TV · ${formatBytes(item.byteSize)}", color = Accent)
+            OutlinedButton(onClick = onDelete) { Text("Hapus") }
         }
     }
 }
@@ -87,7 +129,7 @@ internal fun MediaTransferScreen(
 private fun TransferCard(
     item: MediaTransferItem,
     onRetry: (String) -> Unit,
-    onDelete: (String) -> Unit,
+    onDelete: () -> Unit,
 ) {
     Surface(shape = RoundedCornerShape(16.dp), color = Card) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -100,16 +142,22 @@ private fun TransferCard(
                 }
                 MediaTransferState.Success -> {
                     Text("Tersimpan di TV", color = Accent)
-                    OutlinedButton(onClick = { onDelete(item.source.mediaId) }) { Text("Hapus") }
+                    OutlinedButton(onClick = onDelete) { Text("Hapus") }
                 }
                 is MediaTransferState.Failed -> {
                     Text(state.message, color = Error, style = MaterialTheme.typography.bodySmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { onRetry(item.source.mediaId) }) { Text("Coba lagi") }
-                        OutlinedButton(onClick = { onDelete(item.source.mediaId) }) { Text("Hapus") }
+                        OutlinedButton(onClick = onDelete) { Text("Hapus") }
                     }
                 }
             }
         }
     }
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024L -> "${bytes / (1024L * 1024L)} MB"
+    bytes >= 1024L -> "${bytes / 1024L} KB"
+    else -> "$bytes B"
 }
