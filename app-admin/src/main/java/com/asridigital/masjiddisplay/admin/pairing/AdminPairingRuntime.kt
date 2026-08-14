@@ -4,6 +4,7 @@ import com.asridigital.masjiddisplay.protocol.CompletePairingRequest
 import com.asridigital.masjiddisplay.protocol.CompletePairingResponse
 import com.asridigital.masjiddisplay.protocol.DiscoveredTvService
 import com.asridigital.masjiddisplay.protocol.OpenPairingResponse
+import com.asridigital.masjiddisplay.protocol.ProtocolNegotiation
 
 interface AdminPairingTransportClient {
     fun open(device: DiscoveredTvService): Result<OpenPairingResponse>
@@ -22,38 +23,58 @@ class AdminPairingRuntime(private val transport: AdminPairingTransportClient) {
     var state: AdminRuntimeState = AdminRuntimeState.Discovering
         private set
 
+    fun startDiscovery() {
+        state = AdminRuntimeState.Discovering
+    }
+
     fun onDiscovered(services: List<DiscoveredTvService>) {
+        if (state !is AdminRuntimeState.Discovering && state !is AdminRuntimeState.Devices) return
         state = AdminRuntimeState.Devices(services.distinctBy { "${it.hostAddress}:${it.port}" })
     }
 
-    fun pair(device: DiscoveredTvService) {
-        if (device.negotiation !is com.asridigital.masjiddisplay.protocol.ProtocolNegotiation.Accepted) {
-            state = AdminRuntimeState.Error("Versi protokol TV tidak didukung")
+    fun onDiscoveryFailure(errorCode: Int) {
+        if (state is AdminRuntimeState.Pairing || state is AdminRuntimeState.Paired) return
+        state = AdminRuntimeState.Error("Discovery LAN gagal (kode $errorCode)")
+    }
+
+    fun pair(
+        device: DiscoveredTvService,
+        onStateChanged: (AdminRuntimeState) -> Unit = {},
+    ) {
+        if (device.negotiation !is ProtocolNegotiation.Accepted) {
+            transition(AdminRuntimeState.Error("Versi protokol TV tidak didukung"), onStateChanged)
             return
         }
-        state = AdminRuntimeState.Pairing(device)
+        transition(AdminRuntimeState.Pairing(device), onStateChanged)
         val challenge = transport.open(device).getOrElse {
-            state = AdminRuntimeState.Error("TV tidak dapat membuka sesi pairing")
+            transition(AdminRuntimeState.Error("TV tidak dapat membuka sesi pairing"), onStateChanged)
             return
         }
         val response = transport.complete(
             device,
             CompletePairingRequest(challenge.sessionId, challenge.oneTimeSecret, challenge.protocolVersion),
         ).getOrElse {
-            state = AdminRuntimeState.Error("Koneksi pairing lokal gagal")
+            transition(AdminRuntimeState.Error("Koneksi pairing lokal gagal"), onStateChanged)
             return
         }
-        state = when (response) {
+        when (response) {
             is CompletePairingResponse.Success -> if (response.credentialId.isBlank()) {
-                AdminRuntimeState.Error("Credential pairing tidak valid")
+                transition(AdminRuntimeState.Error("Credential pairing tidak valid"), onStateChanged)
             } else {
-                AdminRuntimeState.Paired(device, response.credentialId)
+                transition(AdminRuntimeState.Paired(device, response.credentialId), onStateChanged)
             }
-            is CompletePairingResponse.Rejected -> AdminRuntimeState.Error("Pairing ditolak: ${response.code.name}")
+            is CompletePairingResponse.Rejected -> {
+                transition(AdminRuntimeState.Error("Pairing ditolak: ${response.code.name}"), onStateChanged)
+            }
         }
     }
 
     fun stop() {
         if (state is AdminRuntimeState.Pairing) state = AdminRuntimeState.Error("Pairing dibatalkan")
+    }
+
+    private fun transition(next: AdminRuntimeState, onStateChanged: (AdminRuntimeState) -> Unit) {
+        state = next
+        onStateChanged(next)
     }
 }
