@@ -72,14 +72,16 @@ class TvConfigHttpHandler(
             rejected(400, "VALIDATION_FAILED", failure.message ?: "Konfigurasi tidak valid")
         } catch (failure: IllegalStateException) {
             rejected(400, "VALIDATION_FAILED", failure.message ?: "Konfigurasi tidak valid")
+        } catch (_: Exception) {
+            rejected(500, "PERSIST_FAILED", "TV gagal menyimpan konfigurasi")
         }
     }
 
     private fun validate(update: TvConfigUpdateRequest) {
-        ZoneId.of(update.timezoneId)
+        require(runCatching { ZoneId.of(update.timezoneId) }.isSuccess) { "Timezone tidak valid" }
         require(update.prayerMethod == "KEMENAG_INDONESIA") { "Metode jadwal sholat tidak didukung" }
-        LocalTime.parse(update.fridayStart)
-        LocalTime.parse(update.fridayEnd)
+        require(runCatching { LocalTime.parse(update.fridayStart) }.isSuccess) { "Waktu mulai Jumat tidak valid" }
+        require(runCatching { LocalTime.parse(update.fridayEnd) }.isSuccess) { "Waktu selesai Jumat tidak valid" }
     }
 
     private fun rejected(status: Int, code: String, message: String): PairingHttpResponse = response(

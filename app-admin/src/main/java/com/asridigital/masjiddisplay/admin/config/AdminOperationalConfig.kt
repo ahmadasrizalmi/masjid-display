@@ -2,6 +2,7 @@ package com.asridigital.masjiddisplay.admin.config
 
 import com.asridigital.masjiddisplay.admin.setup.MosqueSetupDraft
 import com.asridigital.masjiddisplay.protocol.TvConfigUpdateRequest
+import java.time.LocalTime
 
 private val prayers = TvConfigUpdateRequest.canonicalPrayerNames
 
@@ -29,6 +30,8 @@ data class AdminOperationalDraft(
             errors += "Mode tampilan tidak valid"
         }
         if (hijriAdjustmentDays !in -3..3) errors += "Koreksi Hijriah tidak valid"
+        if (runCatching { LocalTime.parse(fridayStart) }.isFailure) errors += "Waktu mulai Jumat tidak valid"
+        if (runCatching { LocalTime.parse(fridayEnd) }.isFailure) errors += "Waktu selesai Jumat tidak valid"
         return errors
     }
 

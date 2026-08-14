@@ -29,9 +29,11 @@ class TvPairingRuntimeOwner(
             server = PairingLanServer(PairingHttpHandler(adapter, configHandler::handle)),
             advertiser = TvNsdAdvertiser(nsdManager),
         )
+        val challenge = adapter.beginPairingForTvDisplay()
         return try {
             created.start()
-            adapter.beginPairingForTvDisplay().also { runtime = created }
+            runtime = created
+            challenge
         } catch (failure: Throwable) {
             created.close()
             throw failure
