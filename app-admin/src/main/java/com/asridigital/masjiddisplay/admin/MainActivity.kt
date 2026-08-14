@@ -17,9 +17,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,8 +33,12 @@ import com.asridigital.masjiddisplay.admin.pairing.AdminPairingCoordinator
 import com.asridigital.masjiddisplay.admin.pairing.AdminPairingRuntime
 import com.asridigital.masjiddisplay.admin.pairing.AdminRuntimeState
 import com.asridigital.masjiddisplay.admin.pairing.LanPairingTransportClient
+import com.asridigital.masjiddisplay.admin.setup.MosqueSetupDraft
+import com.asridigital.masjiddisplay.admin.setup.MosqueSetupReadyScreen
+import com.asridigital.masjiddisplay.admin.setup.MosqueSetupScreen
 import com.asridigital.masjiddisplay.protocol.DiscoveredTvService
 import com.asridigital.masjiddisplay.protocol.ProtocolNegotiation
+import java.time.ZoneId
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -51,6 +55,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var coordinator: AdminPairingCoordinator
     private var uiState by mutableStateOf<AdminRuntimeState>(AdminRuntimeState.Discovering)
     private var fallbackCode by mutableStateOf("")
+    private var mosqueDraft by mutableStateOf(MosqueSetupDraft(timezoneId = ZoneId.systemDefault().id))
+    private var submittedMosqueDraft by mutableStateOf<MosqueSetupDraft?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,13 +85,21 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            AdminPairingScreen(
-                state = uiState,
-                fallbackCode = fallbackCode,
-                onFallbackCodeChanged = { fallbackCode = it },
-                onPair = { device -> coordinator.pair(device, fallbackCode) },
-                onRetry = coordinator::retryDiscovery,
-            )
+            when {
+                submittedMosqueDraft != null -> MosqueSetupReadyScreen(requireNotNull(submittedMosqueDraft))
+                uiState is AdminRuntimeState.Paired -> MosqueSetupScreen(
+                    draft = mosqueDraft,
+                    onDraftChanged = { mosqueDraft = it },
+                    onContinue = { submittedMosqueDraft = it },
+                )
+                else -> AdminPairingScreen(
+                    state = uiState,
+                    fallbackCode = fallbackCode,
+                    onFallbackCodeChanged = { fallbackCode = it },
+                    onPair = { device -> coordinator.pair(device, fallbackCode) },
+                    onRetry = coordinator::retryDiscovery,
+                )
+            }
         }
     }
 
